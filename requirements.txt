@@ -1,0 +1,23 @@
+# Core dependencies
+langchain>=0.1.0
+langchain-openai>=0.0.5
+tiktoken>=0.5.0
+
+# Vector database
+pinecone-client>=3.0.0
+
+# OpenAI (may still be needed for some operations)
+openai>=1.0.0
+
+# HTML parsing
+beautifulsoup4>=4.12.0
+
+# HTTP requests
+requests>=2.31.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Progress bars
+tqdm>=4.66.0
+
