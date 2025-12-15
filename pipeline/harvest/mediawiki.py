@@ -167,13 +167,17 @@ class MediaWikiClient:
         Returns None if the page does not exist (404).
         """
         url = f"{self.rest_url}/page/{quote(title, safe='')}/html"
-        self._respect_rate_limit()
-        resp = self.session.get(url, timeout=self.timeout_s)
-        self._last_request_ts = time.time()
-        if resp.status_code == 404:
-            return None
-        resp.raise_for_status()
-        return resp.text
+        try:
+            resp = self._request("GET", url)
+            return resp.text
+        except requests.HTTPError as e:
+            # Handle 404s gracefully
+            if e.response is not None and e.response.status_code == 404:
+                return None
+            raise
+        except MediaWikiError:
+            # Re-raise MediaWikiError (includes timeout retries exhausted)
+            raise
 
     def page_sections_via_api(self, title: str) -> Optional[Dict[str, str]]:
         """

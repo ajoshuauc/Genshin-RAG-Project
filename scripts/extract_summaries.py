@@ -275,9 +275,38 @@ def extract_summary_section(mw: MediaWikiClient, title: str) -> Optional[str]:
     return summary_text
 
 
+def extract_characters_section(mw: MediaWikiClient, title: str) -> Optional[str]:
+    """
+    Extract the Characters section from a quest page using MediaWiki API.
+    More reliable than parsing HTML. Uses API to get sections and extract characters text.
+    Returns None if no Characters section is found.
+    """
+    # Get all sections via API
+    sections = mw.page_sections_via_api(title)
+    if not sections:
+        return None
+    
+    # Find Characters section (case-insensitive)
+    character_keywords = ("characters", "character", "cast", "characters involved", "characters in quest")
+    characters_index = None
+    
+    for section_name, section_idx in sections.items():
+        section_name_lower = section_name.lower()
+        if any(keyword in section_name_lower for keyword in character_keywords):
+            characters_index = section_idx
+            break
+    
+    if not characters_index:
+        return None
+    
+    # Get the characters section text via API
+    characters_text = mw.page_section_text_via_api(title, characters_index)
+    return characters_text
+
+
 def extract_summaries(mw: Optional[MediaWikiClient] = None):
     """
-    Extract summaries from quest pages.
+    Extract summaries and characters from quest pages.
     
     Args:
         mw: Optional MediaWikiClient instance. If None, creates a new one.
@@ -370,7 +399,7 @@ def extract_summaries(mw: Optional[MediaWikiClient] = None):
             print(f"⚠️  No quest links found in {list_page_title}")
             continue
         
-        # Process each quest page and extract summaries
+        # Process each quest page and extract summaries and characters
         summaries_data: List[Dict] = []
         skipped_count = 0
         output_file = os.path.join(summaries_dir, f"{quest_type}_summaries.json")
@@ -391,15 +420,23 @@ def extract_summaries(mw: Optional[MediaWikiClient] = None):
         
         save_interval = 10  # Save every 10 summaries
         
-        for title in tqdm(quest_titles, desc=f"Extracting summaries from {quest_type}"):
+        for title in tqdm(quest_titles, desc=f"Extracting summaries and characters from {quest_type}"):
             # Extract summary section via API (no need to fetch HTML separately)
             summary = extract_summary_section(mw, title)
+            # Also extract characters section from the same page
+            characters = extract_characters_section(mw, title)
+            
             if summary:
-                summaries_data.append({
+                quest_data = {
                     "title": title,
                     "url": mw.canonical_url(mw.base_url, title),
                     "summary": summary,
-                })
+                }
+                # Add characters if found (optional field)
+                if characters:
+                    quest_data["characters"] = characters
+                
+                summaries_data.append(quest_data)
                 
                 # Save incrementally every N summaries
                 if len(summaries_data) % save_interval == 0:
@@ -416,7 +453,7 @@ def extract_summaries(mw: Optional[MediaWikiClient] = None):
         print(f"⏭️  Skipped {skipped_count} pages (no summary found or page not found)")
     
     print(f"\n{'='*60}")
-    print("✅ All summaries extracted!")
+    print("✅ All summaries and characters extracted!")
     print(f"{'='*60}")
 
 

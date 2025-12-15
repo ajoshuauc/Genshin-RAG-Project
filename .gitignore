@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .env
 .vscode/
+data/
 ./interim
 ./jsonl
 .venv/

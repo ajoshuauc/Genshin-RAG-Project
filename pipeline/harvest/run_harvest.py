@@ -4,7 +4,7 @@ import os, json, sys
 from typing import Dict, Set
 from urllib.parse import unquote
 from tqdm import tqdm
-from pipeline.harvest.mediawiki import MediaWikiClient
+from pipeline.harvest.mediawiki import MediaWikiClient, MediaWikiError
 
 # Add project root to path for importing extract_summaries
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -146,7 +146,11 @@ def main():
             
             # Fetch list page if not already processed
             if list_page_title not in processed:
-                list_page_html = mw.page_html(list_page_title)
+                try:
+                    list_page_html = mw.page_html(list_page_title)
+                except MediaWikiError as e:
+                    print(f"⚠️  Warning: Failed to fetch list page {list_page_title} after retries: {e}")
+                    list_page_html = None
                 if list_page_html:
                     with open(out_path, "a", encoding="utf-8") as f:
                         rec = {
@@ -165,7 +169,11 @@ def main():
             if key in ["story_quests", "world_quests"]:
                 # Get HTML if we just fetched it, otherwise fetch it for link extraction
                 if list_page_html is None:
-                    list_page_html = mw.page_html(list_page_title)
+                    try:
+                        list_page_html = mw.page_html(list_page_title)
+                    except MediaWikiError as e:
+                        print(f"⚠️  Warning: Failed to fetch list page {list_page_title} for link extraction: {e}")
+                        list_page_html = None
                 
                 if list_page_html:
                     extracted_links = extract_quest_links_from_html(list_page_html, mw.base_url)
@@ -217,7 +225,11 @@ def main():
         with open(out_path, "a", encoding="utf-8") as f:
             for m in tqdm(remaining, desc=f"Processing {key}", total=remaining_count, unit="page"):
                 title = m["title"]
-                html = mw.page_html(title)
+                try:
+                    html = mw.page_html(title)
+                except MediaWikiError as e:
+                    print(f"⚠️  Warning: Failed to fetch {title} after retries: {e}")
+                    html = None
                 if not html:
                     continue
                 rec = {
@@ -235,7 +247,11 @@ def main():
                     for subpage in CHARACTER_SUBPAGES:
                         subpage_title = f"{title}/{subpage}"
                         if subpage_title not in processed:
-                            subpage_html = mw.page_html(subpage_title)
+                            try:
+                                subpage_html = mw.page_html(subpage_title)
+                            except MediaWikiError as e:
+                                print(f"⚠️  Warning: Failed to fetch subpage {subpage_title} after retries: {e}")
+                                subpage_html = None
                             if subpage_html:
                                 rec = {
                                     "title": subpage_title,

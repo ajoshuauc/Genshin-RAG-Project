@@ -359,6 +359,7 @@ def main():
                     "url": rec["source_url"],
                     "lang": rec.get("lang", "en"),
                     "content_type": "summary",
+                    "characters": rec.get("characters", []),  # Add characters to metadata
                 })
                 batch_ids.append(sanitized_id)
                 
