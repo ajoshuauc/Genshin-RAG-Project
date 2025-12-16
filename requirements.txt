@@ -6,6 +6,7 @@ tiktoken>=0.5.0
 
 # Vector database
 pinecone-client>=3.0.0
+langchain-pinecone>=0.0.1
 
 # OpenAI (may still be needed for some operations)
 openai>=1.0.0

@@ -12,7 +12,20 @@ import sys
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from pipeline.harvest.mediawiki import MediaWikiClient
+from scraper.pipeline.harvest.mediawiki import MediaWikiClient
+
+# Helper to find data directory (check scraper/data first, then project_root/data)
+def get_data_dir():
+    """Find the data directory, checking scraper/data first, then project_root/data."""
+    scraper_data = os.path.join(project_root, "scraper", "data")
+    root_data = os.path.join(project_root, "data")
+    if os.path.exists(scraper_data):
+        return scraper_data
+    elif os.path.exists(root_data):
+        return root_data
+    else:
+        # Default to scraper/data if neither exists (will be created)
+        return scraper_data
 
 # The three list pages to process
 LIST_PAGES = {
@@ -318,7 +331,8 @@ def extract_summaries(mw: Optional[MediaWikiClient] = None):
         )
     
     # Create summaries directory
-    summaries_dir = "data/interim/summaries"
+    data_dir = get_data_dir()
+    summaries_dir = os.path.join(data_dir, "interim", "summaries")
     os.makedirs(summaries_dir, exist_ok=True)
     
     for quest_type, list_page_title in LIST_PAGES.items():

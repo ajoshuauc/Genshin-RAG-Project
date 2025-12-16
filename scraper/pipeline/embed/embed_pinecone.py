@@ -13,6 +13,21 @@ from tqdm import tqdm
 load_dotenv()
 EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
 
+# Helper to find data directory (check scraper/data first, then project_root/data)
+def get_data_dir():
+    """Find the data directory, checking scraper/data first, then project_root/data."""
+    # Calculate project root (3 levels up from scraper/pipeline/embed/embed_pinecone.py)
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    scraper_data = os.path.join(project_root, "scraper", "data")
+    root_data = os.path.join(project_root, "data")
+    if os.path.exists(scraper_data):
+        return scraper_data
+    elif os.path.exists(root_data):
+        return root_data
+    else:
+        # Default to scraper/data if neither exists (will be created)
+        return scraper_data
+
 def sanitize_vector_id(vector_id: str) -> str:
     """
     Sanitize vector ID to be ASCII-only and within Pinecone's 512 character limit.
@@ -158,7 +173,8 @@ def main():
     embeddings = OpenAIEmbeddings(model=EMBED_MODEL)
     
     # Initialize progress tracking
-    progress_file = "data/interim/embedding_progress.txt"
+    data_dir = get_data_dir()
+    progress_file = os.path.join(data_dir, "interim", "embedding_progress.txt")
     processed_ids = load_processed_ids(progress_file)
     if processed_ids:
         print(f"📂 Resuming: Found {len(processed_ids)} already-processed vectors")
@@ -166,8 +182,9 @@ def main():
         print("🆕 Starting fresh embedding run")
     
     # Embed and upsert each corpus file
+    jsonl_dir = os.path.join(data_dir, "jsonl")
     for corpus in ["characters", "archon_quests", "story_quests", "world_quests", "books"]:
-        path = f"data/jsonl/{corpus}.jsonl"
+        path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
         if not os.path.exists(path):
             print(f"⏭️  Skipping {corpus} (file not found)")
             continue
@@ -298,7 +315,7 @@ def main():
     ]
     
     for corpus in summary_corpus_list:
-        path = f"data/jsonl/{corpus}.jsonl"
+        path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
         if not os.path.exists(path):
             print(f"⏭️  Skipping {corpus} (file not found)")
             continue

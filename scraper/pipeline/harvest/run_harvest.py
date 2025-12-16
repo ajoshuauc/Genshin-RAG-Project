@@ -4,12 +4,26 @@ import os, json, sys
 from typing import Dict, Set
 from urllib.parse import unquote
 from tqdm import tqdm
-from pipeline.harvest.mediawiki import MediaWikiClient, MediaWikiError
 
-# Add project root to path for importing extract_summaries
+# Add project root to path for importing modules
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
+
+from scraper.pipeline.harvest.mediawiki import MediaWikiClient, MediaWikiError
+
+# Helper to find data directory (check scraper/data first, then project_root/data)
+def get_data_dir():
+    """Find the data directory, checking scraper/data first, then project_root/data."""
+    scraper_data = os.path.join(project_root, "scraper", "data")
+    root_data = os.path.join(project_root, "data")
+    if os.path.exists(scraper_data):
+        return scraper_data
+    elif os.path.exists(root_data):
+        return root_data
+    else:
+        # Default to scraper/data if neither exists (will be created)
+        return scraper_data
 
 CATEGORIES: Dict[str, str] = {
     "characters": "Category:Characters",
@@ -128,10 +142,12 @@ def main():
         user_agent=os.getenv("USER_AGENT", "genshin-rag/1.0 (contact: ajoshuauc@gmail.com)"),
         base_url=os.getenv("WIKI_BASE", "https://genshin-impact.fandom.com"),
     )
-    os.makedirs("data/interim", exist_ok=True)
+    data_dir = get_data_dir()
+    interim_dir = os.path.join(data_dir, "interim")
+    os.makedirs(interim_dir, exist_ok=True)
 
     for key, cat in CATEGORIES.items():
-        out_path = f"data/interim/{key}.ndjson"
+        out_path = os.path.join(interim_dir, f"{key}.ndjson")
         
         # Load already processed titles
         processed = load_processed_titles(out_path)
@@ -271,7 +287,7 @@ def main():
     print("Extracting quest summaries...")
     print(f"{'='*60}")
     try:
-        from scripts.extract_summaries import extract_summaries
+        from scraper.scripts.extract_summaries import extract_summaries
         extract_summaries(mw)
     except ImportError as e:
         print(f"⚠️  Warning: Could not import extract_summaries: {e}")

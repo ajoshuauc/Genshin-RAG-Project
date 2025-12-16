@@ -9,12 +9,26 @@ from typing import Set
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from pipeline.preprocess.clean_html import html_to_markdownish
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from scraper.pipeline.preprocess.clean_html import html_to_markdownish
 
-SRC_DIR = "data/interim"
+# Helper to find data directory (check scraper/data first, then project_root/data)
+def get_data_dir():
+    """Find the data directory, checking scraper/data first, then project_root/data."""
+    scraper_data = os.path.join(project_root, "scraper", "data")
+    root_data = os.path.join(project_root, "data")
+    if os.path.exists(scraper_data):
+        return scraper_data
+    elif os.path.exists(root_data):
+        return root_data
+    else:
+        # Default to scraper/data if neither exists (will be created)
+        return scraper_data
+
+data_dir = get_data_dir()
+SRC_DIR = os.path.join(data_dir, "interim")
 SUMMARIES_DIR = os.path.join(SRC_DIR, "summaries")
-DST_DIR = "data/jsonl"
+DST_DIR = os.path.join(data_dir, "jsonl")
 
 # Global set to track all IDs across all files to ensure uniqueness
 all_ids: Set[str] = set()
