@@ -1,5 +1,5 @@
 from typing import Dict
-from langchain.memory import ConversationSummaryBufferMemory
+from langchain_community.memory import ConversationSummaryBufferMemory
 
 from backend.core.deps import get_llm
 from backend.core.config import config

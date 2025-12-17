@@ -9,6 +9,9 @@ class Config:
     PINECONE_INDEX_NAME: str = os.getenv("PINECONE_INDEX_NAME", "genshin-lore")
     PINECONE_API_KEY: str = os.getenv("PINECONE_API_KEY", "YOUR_KEY")
 
+    # Postgres
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+
     # Retrieval
     TOP_K: int = int(os.getenv("TOP_K", "6"))
 

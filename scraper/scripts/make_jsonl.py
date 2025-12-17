@@ -6,7 +6,7 @@ import re
 from typing import Set
 
 # Add project root to Python path
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -48,7 +48,19 @@ def create_unique_id(base_id: str) -> str:
     """
     Create a unique ID, appending hash suffix if needed.
     Ensures uniqueness across all JSON files.
+    Limits ID length to 512 characters for Pinecone compatibility.
     """
+    MAX_LENGTH = 512
+    
+    # First, truncate base_id if too long (before uniqueness check)
+    if len(base_id) > MAX_LENGTH:
+        # Create a hash of the full ID for uniqueness (first 12 chars of MD5)
+        full_hash = hashlib.md5(base_id.encode('utf-8')).hexdigest()[:12]
+        # Truncate to leave room for hash suffix (MAX_LENGTH - 1 for separator - 12 for hash)
+        truncate_to = MAX_LENGTH - 13
+        base_id = base_id[:truncate_to] + '_' + full_hash
+    
+    # Now check uniqueness (base_id is guaranteed to be <= 512 at this point)
     if base_id not in all_ids:
         all_ids.add(base_id)
         return base_id
@@ -58,6 +70,12 @@ def create_unique_id(base_id: str) -> str:
     while True:
         suffix = hashlib.sha1(f"{base_id}_{counter}".encode("utf-8")).hexdigest()[:8]
         unique_id = f"{base_id}_{suffix}"
+        # If adding suffix makes it too long, truncate base_id part more
+        if len(unique_id) > MAX_LENGTH:
+            # Leave room for suffix: MAX_LENGTH - 1 (underscore) - 8 (suffix)
+            truncate_base_to = MAX_LENGTH - 9
+            unique_id = f"{base_id[:truncate_base_to]}_{suffix}"
+        
         if unique_id not in all_ids:
             all_ids.add(unique_id)
             return unique_id
@@ -198,7 +216,7 @@ def main():
         dst = os.path.join(DST_DIR, f"{corpus}.jsonl")
         print(f"📝 Processing {corpus}...")
         process_ndjson_file(src, dst, corpus)
-        print(f"✅ Wrote {dst} ({len([l for l in open(dst)])} chunks)")
+        print(f"✅ Wrote {dst} ({len([l for l in open(dst, encoding='utf-8')])} chunks)")
     
     # Process summary JSON files
     if os.path.exists(SUMMARIES_DIR):
@@ -213,7 +231,7 @@ def main():
             dst = os.path.join(DST_DIR, f"{corpus}_summaries.jsonl")
             print(f"📝 Processing {corpus} summaries...")
             process_summary_file(src, dst, corpus)
-            print(f"✅ Wrote {dst} ({len([l for l in open(dst)])} chunks)")
+            print(f"✅ Wrote {dst} ({len([l for l in open(dst, encoding='utf-8')])} chunks)")
     
     print(f"\n✅ Total unique IDs created: {len(all_ids)}")
 
