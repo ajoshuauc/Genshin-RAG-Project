@@ -13,7 +13,6 @@ def get_llm() -> ChatOpenAI:
         temperature=0
     )
 
-
 @lru_cache
 def get_embeddings() -> OpenAIEmbeddings:
     return OpenAIEmbeddings(

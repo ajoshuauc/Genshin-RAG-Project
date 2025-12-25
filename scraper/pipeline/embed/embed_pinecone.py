@@ -30,17 +30,16 @@ def get_data_dir():
 
 def sanitize_vector_id(vector_id: str) -> str:
     """
-    Sanitize vector ID to be ASCII-only and within Pinecone's 512 character limit.
-    Converts non-ASCII characters to ASCII equivalents or removes them.
-    Truncates long IDs and appends a hash suffix to ensure uniqueness.
+    Sanitize vector ID to be ASCII-only for Pinecone compatibility.
+    IDs from make_jsonl.py are already <= 512 chars, so we only need Unicode/ASCII normalization.
     
     Args:
-        vector_id: Original vector ID (may contain non-ASCII and be > 512 chars)
+        vector_id: Original vector ID (may contain non-ASCII characters)
     
     Returns:
-        ASCII-safe vector ID (max 512 characters)
+        ASCII-safe vector ID
     """
-    # First, try to normalize unicode characters (e.g., convert accented chars to base)
+    # Normalize unicode characters (e.g., convert accented chars to base: "é" → "e")
     normalized = unicodedata.normalize('NFKD', vector_id)
     
     # Convert to ASCII, ignoring non-ASCII characters
@@ -55,12 +54,11 @@ def sanitize_vector_id(vector_id: str) -> str:
     # Remove leading/trailing underscores
     ascii_id = ascii_id.strip('_')
     
-    # If ID is too long, truncate and append hash for uniqueness
+    # IDs should already be <= 512 from make_jsonl.py, but add safety check
     MAX_LENGTH = 512
     if len(ascii_id) > MAX_LENGTH:
-        # Create a hash of the full ID for uniqueness (first 12 chars of MD5)
+        # Fallback: truncate and hash (shouldn't happen, but safety net)
         full_hash = hashlib.md5(vector_id.encode('utf-8')).hexdigest()[:12]
-        # Truncate to leave room for hash suffix (MAX_LENGTH - 1 for separator - 12 for hash)
         truncate_to = MAX_LENGTH - 13
         ascii_id = ascii_id[:truncate_to] + '_' + full_hash
     
@@ -148,6 +146,149 @@ def save_processed_ids(progress_file: str, vector_ids: list[str]):
     except Exception as e:
         print(f"⚠️  Warning: Could not save progress to {progress_file}: {e}")
 
+def embed_corpus_file(
+    corpus: str,
+    path: str,
+    index,
+    embeddings,
+    processed_ids: set,
+    progress_file: str,
+    content_type: str = "full"
+):
+    """
+    Embed and upsert a single corpus JSONL file to Pinecone.
+    
+    Args:
+        corpus: Name of the corpus
+        path: Path to the JSONL file
+        index: Pinecone index object
+        embeddings: LangChain embeddings object
+        processed_ids: Set of already processed IDs (updated in place)
+        progress_file: Path to progress tracking file
+        content_type: "full" or "summary" for metadata
+    """
+    if not os.path.exists(path):
+        print(f"⏭️  Skipping {corpus} (file not found)")
+        return
+    
+    total_lines = count_jsonl_lines(path)
+    if total_lines == 0:
+        print(f"⏭️  Skipping {corpus} (empty file)")
+        return
+    
+    print(f"🔎 Embedding {corpus} ({total_lines} chunks)")
+    batch = []
+    batch_ids = []
+    batch_texts = []
+    batch_metadatas = []
+    already_processed_count = 0
+    filtered_count = 0
+    newly_embedded_count = 0
+    seen_ids_this_run = set()
+    
+    for rec in tqdm(iter_jsonl(path), total=total_lines, desc=f"Embedding {corpus}", unit="chunk"):
+        try:
+            # Sanitize ID to be ASCII-only for Pinecone
+            original_sanitized_id = sanitize_vector_id(rec["id"])
+            sanitized_id = original_sanitized_id
+            
+            # If this ID was already seen in this run, append text_hash to make it unique
+            if sanitized_id in seen_ids_this_run:
+                text_hash = rec.get("text_hash", "")
+                if text_hash:
+                    sanitized_id = f"{sanitized_id}_{text_hash[:8]}"
+                else:
+                    text_hash_fallback = hashlib.sha1(rec.get("text", "").encode("utf-8")).hexdigest()[:8]
+                    sanitized_id = f"{sanitized_id}_{text_hash_fallback}"
+                
+                # Handle hash collisions
+                collision_count = 0
+                while sanitized_id in seen_ids_this_run:
+                    collision_count += 1
+                    text_hash = rec.get("text_hash", "")
+                    if text_hash:
+                        sanitized_id = f"{original_sanitized_id}_{text_hash[:12]}_{collision_count}"
+                    else:
+                        text_hash_fallback = hashlib.sha1(f"{rec.get('text', '')}{collision_count}".encode("utf-8")).hexdigest()[:12]
+                        sanitized_id = f"{original_sanitized_id}_{text_hash_fallback}"
+            
+            seen_ids_this_run.add(sanitized_id)
+            
+            # Skip if already processed
+            if sanitized_id in processed_ids:
+                already_processed_count += 1
+                continue
+            
+            # Skip low-quality chunks
+            if should_skip_chunk(rec.get("text", "")):
+                filtered_count += 1
+                continue
+            
+            # Prepare batch for LangChain
+            batch_texts.append(rec["text"])
+            metadata = {
+                "type": rec["type"],
+                "title": rec["title"],
+                "section": rec["section"],
+                "url": rec["source_url"],
+                "lang": rec.get("lang", "en"),
+                "content_type": content_type,
+            }
+            # Add characters field for summaries
+            if content_type == "summary" and "characters" in rec:
+                metadata["characters"] = rec["characters"]
+            batch_metadatas.append(metadata)
+            batch_ids.append(sanitized_id)
+            
+            # Process batch when it reaches 100
+            if len(batch_texts) >= 100:
+                # Generate embeddings using LangChain
+                embeds = embeddings.embed_documents(batch_texts)
+                
+                # Prepare batch for Pinecone
+                batch = [
+                    (batch_ids[i], embeds[i], batch_metadatas[i])
+                    for i in range(len(batch_ids))
+                ]
+                
+                index.upsert(batch)
+                save_processed_ids(progress_file, batch_ids)
+                processed_ids.update(batch_ids)
+                newly_embedded_count += len(batch_ids)
+                
+                batch = []
+                batch_ids = []
+                batch_texts = []
+                batch_metadatas = []
+        except Exception as e:
+            print(f"⚠️  Error processing chunk {rec.get('id', 'unknown')}: {e}")
+            continue
+    
+    # Process final batch if any remain
+    if batch_texts:
+        embeds = embeddings.embed_documents(batch_texts)
+        batch = [
+            (batch_ids[i], embeds[i], batch_metadatas[i])
+            for i in range(len(batch_ids))
+        ]
+        index.upsert(batch)
+        save_processed_ids(progress_file, batch_ids)
+        processed_ids.update(batch_ids)
+        newly_embedded_count += len(batch_ids)
+    
+    # Report statistics
+    stats_parts = []
+    if already_processed_count > 0:
+        stats_parts.append(f"{already_processed_count} already processed")
+    if newly_embedded_count > 0:
+        stats_parts.append(f"{newly_embedded_count} newly embedded")
+    if filtered_count > 0:
+        stats_parts.append(f"{filtered_count} filtered (low quality)")
+    
+    if stats_parts:
+        print(f"   📊 {', '.join(stats_parts)}")
+    print(f"✅ Completed {corpus}")
+
 def main():
     # Initialize Pinecone
     pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
@@ -185,123 +326,15 @@ def main():
     jsonl_dir = os.path.join(data_dir, "jsonl")
     for corpus in ["characters", "archon_quests", "story_quests", "world_quests", "books"]:
         path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
-        if not os.path.exists(path):
-            print(f"⏭️  Skipping {corpus} (file not found)")
-            continue
-        
-        total_lines = count_jsonl_lines(path)
-        if total_lines == 0:
-            print(f"⏭️  Skipping {corpus} (empty file)")
-            continue
-            
-        print(f"🔎 Embedding {corpus} ({total_lines} chunks)")
-        batch = []
-        batch_ids = []
-        batch_texts = []
-        batch_metadatas = []
-        already_processed_count = 0
-        filtered_count = 0
-        newly_embedded_count = 0
-        seen_ids_this_run = set()
-        
-        for rec in tqdm(iter_jsonl(path), total=total_lines, desc=f"Embedding {corpus}", unit="chunk"):
-            try:
-                # Sanitize ID to be ASCII-only for Pinecone
-                original_sanitized_id = sanitize_vector_id(rec["id"])
-                sanitized_id = original_sanitized_id
-                
-                # If this ID was already seen in this run, append text_hash to make it unique
-                if sanitized_id in seen_ids_this_run:
-                    text_hash = rec.get("text_hash", "")
-                    if text_hash:
-                        sanitized_id = f"{sanitized_id}_{text_hash[:8]}"
-                    else:
-                        text_hash_fallback = hashlib.sha1(rec.get("text", "").encode("utf-8")).hexdigest()[:8]
-                        sanitized_id = f"{sanitized_id}_{text_hash_fallback}"
-                    
-                    # Handle hash collisions
-                    collision_count = 0
-                    while sanitized_id in seen_ids_this_run:
-                        collision_count += 1
-                        text_hash = rec.get("text_hash", "")
-                        if text_hash:
-                            sanitized_id = f"{original_sanitized_id}_{text_hash[:12]}_{collision_count}"
-                        else:
-                            text_hash_fallback = hashlib.sha1(f"{rec.get('text', '')}{collision_count}".encode("utf-8")).hexdigest()[:12]
-                            sanitized_id = f"{original_sanitized_id}_{text_hash_fallback}"
-                
-                seen_ids_this_run.add(sanitized_id)
-                
-                # Skip if already processed
-                if sanitized_id in processed_ids:
-                    already_processed_count += 1
-                    continue
-                
-                # Skip low-quality chunks
-                if should_skip_chunk(rec.get("text", "")):
-                    filtered_count += 1
-                    continue
-                
-                # Prepare batch for LangChain
-                batch_texts.append(rec["text"])
-                batch_metadatas.append({
-                    "type": rec["type"],
-                    "title": rec["title"],
-                    "section": rec["section"],
-                    "url": rec["source_url"],
-                    "lang": rec.get("lang", "en"),
-                    "content_type": "full",
-                })
-                batch_ids.append(sanitized_id)
-                
-                # Process batch when it reaches 100
-                if len(batch_texts) >= 100:
-                    # Generate embeddings using LangChain
-                    embeds = embeddings.embed_documents(batch_texts)
-                    
-                    # Prepare batch for Pinecone
-                    batch = [
-                        (batch_ids[i], embeds[i], batch_metadatas[i])
-                        for i in range(len(batch_ids))
-                    ]
-                    
-                    index.upsert(batch)
-                    save_processed_ids(progress_file, batch_ids)
-                    processed_ids.update(batch_ids)
-                    newly_embedded_count += len(batch_ids)
-                    
-                    batch = []
-                    batch_ids = []
-                    batch_texts = []
-                    batch_metadatas = []
-            except Exception as e:
-                print(f"⚠️  Error processing chunk {rec.get('id', 'unknown')}: {e}")
-                continue
-        
-        # Process final batch if any remain
-        if batch_texts:
-            embeds = embeddings.embed_documents(batch_texts)
-            batch = [
-                (batch_ids[i], embeds[i], batch_metadatas[i])
-                for i in range(len(batch_ids))
-            ]
-            index.upsert(batch)
-            save_processed_ids(progress_file, batch_ids)
-            processed_ids.update(batch_ids)
-            newly_embedded_count += len(batch_ids)
-        
-        # Report statistics
-        stats_parts = []
-        if already_processed_count > 0:
-            stats_parts.append(f"{already_processed_count} already processed")
-        if newly_embedded_count > 0:
-            stats_parts.append(f"{newly_embedded_count} newly embedded")
-        if filtered_count > 0:
-            stats_parts.append(f"{filtered_count} filtered (low quality)")
-        
-        if stats_parts:
-            print(f"   📊 {', '.join(stats_parts)}")
-        print(f"✅ Completed {corpus}")
+        embed_corpus_file(
+            corpus=corpus,
+            path=path,
+            index=index,
+            embeddings=embeddings,
+            processed_ids=processed_ids,
+            progress_file=progress_file,
+            content_type="full"
+        )
     
     # Embed summaries from JSONL files (if they exist)
     print(f"\n{'='*60}")
@@ -316,111 +349,15 @@ def main():
     
     for corpus in summary_corpus_list:
         path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
-        if not os.path.exists(path):
-            print(f"⏭️  Skipping {corpus} (file not found)")
-            continue
-        
-        total_lines = count_jsonl_lines(path)
-        if total_lines == 0:
-            print(f"⏭️  Skipping {corpus} (empty file)")
-            continue
-        
-        print(f"🔎 Embedding {corpus} ({total_lines} chunks)")
-        batch = []
-        batch_ids = []
-        batch_texts = []
-        batch_metadatas = []
-        already_processed_count = 0
-        filtered_count = 0
-        newly_embedded_count = 0
-        seen_ids_this_run = set()
-        
-        for rec in tqdm(iter_jsonl(path), total=total_lines, desc=f"Embedding {corpus}", unit="chunk"):
-            try:
-                original_sanitized_id = sanitize_vector_id(rec["id"])
-                sanitized_id = original_sanitized_id
-                
-                if sanitized_id in seen_ids_this_run:
-                    text_hash = rec.get("text_hash", "")
-                    if text_hash:
-                        sanitized_id = f"{sanitized_id}_{text_hash[:8]}"
-                    else:
-                        text_hash_fallback = hashlib.sha1(rec.get("text", "").encode("utf-8")).hexdigest()[:8]
-                        sanitized_id = f"{sanitized_id}_{text_hash_fallback}"
-                    
-                    collision_count = 0
-                    while sanitized_id in seen_ids_this_run:
-                        collision_count += 1
-                        text_hash = rec.get("text_hash", "")
-                        if text_hash:
-                            sanitized_id = f"{original_sanitized_id}_{text_hash[:12]}_{collision_count}"
-                        else:
-                            text_hash_fallback = hashlib.sha1(f"{rec.get('text', '')}{collision_count}".encode("utf-8")).hexdigest()[:12]
-                            sanitized_id = f"{original_sanitized_id}_{text_hash_fallback}"
-                
-                seen_ids_this_run.add(sanitized_id)
-                
-                if sanitized_id in processed_ids:
-                    already_processed_count += 1
-                    continue
-                
-                if should_skip_chunk(rec.get("text", "")):
-                    filtered_count += 1
-                    continue
-                
-                batch_texts.append(rec["text"])
-                batch_metadatas.append({
-                    "type": rec["type"],
-                    "title": rec["title"],
-                    "section": rec["section"],
-                    "url": rec["source_url"],
-                    "lang": rec.get("lang", "en"),
-                    "content_type": "summary",
-                    "characters": rec.get("characters", []),  # Add characters to metadata
-                })
-                batch_ids.append(sanitized_id)
-                
-                if len(batch_texts) >= 100:
-                    embeds = embeddings.embed_documents(batch_texts)
-                    batch = [
-                        (batch_ids[i], embeds[i], batch_metadatas[i])
-                        for i in range(len(batch_ids))
-                    ]
-                    index.upsert(batch)
-                    save_processed_ids(progress_file, batch_ids)
-                    processed_ids.update(batch_ids)
-                    newly_embedded_count += len(batch_ids)
-                    
-                    batch = []
-                    batch_ids = []
-                    batch_texts = []
-                    batch_metadatas = []
-            except Exception as e:
-                print(f"⚠️  Error processing chunk {rec.get('id', 'unknown')}: {e}")
-                continue
-        
-        if batch_texts:
-            embeds = embeddings.embed_documents(batch_texts)
-            batch = [
-                (batch_ids[i], embeds[i], batch_metadatas[i])
-                for i in range(len(batch_ids))
-            ]
-            index.upsert(batch)
-            save_processed_ids(progress_file, batch_ids)
-            processed_ids.update(batch_ids)
-            newly_embedded_count += len(batch_ids)
-        
-        stats_parts = []
-        if already_processed_count > 0:
-            stats_parts.append(f"{already_processed_count} already processed")
-        if newly_embedded_count > 0:
-            stats_parts.append(f"{newly_embedded_count} newly embedded")
-        if filtered_count > 0:
-            stats_parts.append(f"{filtered_count} filtered (low quality)")
-        
-        if stats_parts:
-            print(f"   📊 {', '.join(stats_parts)}")
-        print(f"✅ Completed {corpus}")
+        embed_corpus_file(
+            corpus=corpus,
+            path=path,
+            index=index,
+            embeddings=embeddings,
+            processed_ids=processed_ids,
+            progress_file=progress_file,
+            content_type="summary"
+        )
 
 if __name__ == "__main__":
     main()

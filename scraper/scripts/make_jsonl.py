@@ -3,12 +3,13 @@ from __future__ import annotations
 import os, json, hashlib
 import sys
 import re
-from typing import Set
+from typing import Set, List
 
 # Add project root to Python path
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, project_root)
 
+import tiktoken
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from scraper.pipeline.preprocess.clean_html import html_to_markdownish
 
@@ -33,13 +34,19 @@ DST_DIR = os.path.join(data_dir, "jsonl")
 # Global set to track all IDs across all files to ensure uniqueness
 all_ids: Set[str] = set()
 
+# Initialize tiktoken encoder for text-embedding-3-small (uses cl100k_base encoding)
+encoding = tiktoken.get_encoding("cl100k_base")
+
+def count_tokens(text: str) -> int:
+    """Count tokens in text using tiktoken."""
+    return len(encoding.encode(text))
+
 # LangChain text splitter optimized for text-embedding-3-small
 # Max tokens: 8191, target ~800 tokens per chunk with overlap
-# Rough estimate: 1 token ≈ 4 characters for English
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=800,  # Target ~800 tokens (3200 chars)
-    chunk_overlap=150,  # Overlap ~150 tokens (600 chars)
-    length_function=len,  # Character-based (can be upgraded to token-based)
+    chunk_size=400,  # Target ~800 tokens per chunk
+    chunk_overlap=60,  # Overlap ~150 tokens
+    length_function=count_tokens,  # Token-based using tiktoken
     separators=["\n\n", "\n", ". ", " ", ""],  # Split on paragraphs, lines, sentences, words
     is_separator_regex=False,
 )
@@ -92,6 +99,36 @@ def sanitize_title(title: str) -> str:
     # Remove leading/trailing underscores
     sanitized = sanitized.strip('_')
     return sanitized
+
+def parse_characters(characters_str: str) -> List[str]:
+    """
+    Parse characters string into a list of character names.
+    
+    Format: "Characters\n[\n]\n16\nCharacters\nappear in this Act:\nAmber\nCyrus\n..."
+    Returns: ["Amber", "Cyrus", "Diluc", ...]
+    """
+    if not characters_str or not characters_str.strip():
+        return []
+    
+    # Find the line that contains "appear" (e.g., "appear in this Act:" or "appear in this Chapter:")
+    lines = characters_str.split('\n')
+    start_idx = -1
+    for i, line in enumerate(lines):
+        if 'appear' in line.lower():
+            start_idx = i + 1
+            break
+    
+    if start_idx == -1:
+        return []
+    
+    # Extract character names (everything after the "appear" line)
+    character_names = []
+    for line in lines[start_idx:]:
+        name = line.strip()
+        if name and name not in character_names:  # Avoid duplicates
+            character_names.append(name)
+    
+    return character_names
 
 def process_ndjson_file(src: str, dst: str, corpus: str):
     """Process NDJSON file with HTML content using LangChain chunking."""
@@ -169,6 +206,11 @@ def process_summary_file(src: str, dst: str, corpus: str):
             if not summary_text.strip():
                 continue
             
+            # Parse characters from string format to list
+            characters_list = []
+            if "characters" in rec:
+                characters_list = parse_characters(rec["characters"])
+            
             # Use LangChain to chunk the summary
             chunks = text_splitter.split_text(summary_text)
             
@@ -194,6 +236,10 @@ def process_summary_file(src: str, dst: str, corpus: str):
                     "text": chunk,
                     "text_hash": hashlib.sha1(chunk.encode("utf-8")).hexdigest(),
                 }
+                # Add characters list if available
+                if characters_list:
+                    out["characters"] = characters_list
+                
                 fout.write(json.dumps(out, ensure_ascii=False) + "\n")
 
 def main():
