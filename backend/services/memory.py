@@ -31,4 +31,4 @@ def persist_memory(session_id: str, memory: ConversationSummaryBufferMemory) -> 
     """
     Saves the current summary to the database.
     """
-    update_summary(session_id, memory.moving_summary_buffer)
+    update_summary(session_id, memory.moving_summary_buffer or "")
