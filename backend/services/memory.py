@@ -1,4 +1,4 @@
-from langchain_community.memory import ConversationSummaryBufferMemory
+from langchain_classic.memory import ConversationSummaryBufferMemory
 from langchain_community.chat_message_histories import SQLChatMessageHistory
 
 from backend.core.deps import get_llm
