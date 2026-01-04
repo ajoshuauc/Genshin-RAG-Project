@@ -5,7 +5,7 @@ from pinecone import Pinecone
 load_dotenv()
 
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-index_name = os.getenv("PINECONE_INDEX")
+index_name = os.getenv("PINECONE_INDEX_NAME")
 
 # Safety confirmation
 confirm = input(f"⚠️  Are you sure you want to delete ALL vectors from index '{index_name}'? (yes/no): ")

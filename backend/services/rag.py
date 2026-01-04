@@ -83,6 +83,14 @@ def answer_with_rag(session_id: str, user_message: str) -> tuple[str, list]:
     # 2) Retrieve relevant context - use invoke() instead of get_relevant_documents()
     docs = retriever.invoke(rewritten_query)
     context = format_docs(docs)
+    
+    # Debug logging
+    print(f"DEBUG: Retrieved {len(docs)} documents")
+    print(f"DEBUG: Context length: {len(context)} characters")
+    if context:
+        print(f"DEBUG: Context preview (first 200 chars): {context[:200]}")
+    else:
+        print(f"DEBUG: Context is empty - using fallback")
 
     # 3) Answer
     answer = answer_chain.invoke({

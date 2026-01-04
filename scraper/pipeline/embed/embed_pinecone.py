@@ -293,7 +293,7 @@ def embed_corpus_file(
 def main():
     # Initialize Pinecone
     pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
-    index_name = os.environ.get("PINECONE_INDEX", "genshin-lore")
+    index_name = os.environ.get("PINECONE_INDEX_NAME", "genshin-lore")
     
     # Get embedding dimension based on model
     # text-embedding-3-small: 1536 dimensions
