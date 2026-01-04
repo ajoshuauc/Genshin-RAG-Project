@@ -1,6 +1,5 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_community.retrievers import MultiQueryRetriever
 
 from backend.core.deps import get_llm, get_vectorstore
 from backend.core.config import config
@@ -23,17 +22,23 @@ def build_retriever():
     llm = get_llm()
 
     base = vs.as_retriever(search_kwargs={"k": config.TOP_K})
-    return MultiQueryRetriever.from_llm(retrievers=base, llm=llm)
+    return base
 
 def build_answer_chain():
     llm = get_llm()
     prompt = ChatPromptTemplate.from_template(
-        """You are a Genshin Impact lore explainer.
+        """You are a knowledgeable Genshin Impact lore expert helping users understand the game's story and characters.
 
-    Rules:
-    - Use ONLY the LORE CONTEXT to answer.
-    - If the context lacks info, say you don't have enough info.
-    - Explain clearly, step-by-step, like teaching someone catching up.
+    Your task is to answer questions using the provided LORE CONTEXT. The context may contain information from multiple sources - piece together relevant details to form a complete answer.
+
+    Guidelines:
+    - Synthesize information from ALL relevant context chunks, even if they don't directly state the answer
+    - Make reasonable inferences based on the context (e.g., if context describes actions/behaviors, you can infer motivations)
+    - Connect related information across different context sections
+    - Use the CONVERSATION SUMMARY and RECENT CHAT to understand what was previously discussed
+    - If the context contains ANY relevant information (even indirect), use it to answer - don't say "not enough info" unless the context is truly empty or completely unrelated
+    - When context is limited, provide what you CAN infer and note any uncertainties
+    - Explain clearly and comprehensively, as if teaching someone the lore
 
     CONVERSATION SUMMARY:
     {summary}
@@ -48,7 +53,7 @@ def build_answer_chain():
     {question}
 
     ANSWER:"""
-        )
+            )
     return prompt | llm | StrOutputParser()
 
 def answer_with_rag(session_id: str, user_message: str) -> tuple[str, list]:
@@ -75,8 +80,8 @@ def answer_with_rag(session_id: str, user_message: str) -> tuple[str, list]:
     # 1) Rewrite query
     rewritten_query = rewrite_chain.invoke({"question": user_message})
 
-    # 2) Retrieve relevant context
-    docs = retriever.get_relevant_documents(rewritten_query)
+    # 2) Retrieve relevant context - use invoke() instead of get_relevant_documents()
+    docs = retriever.invoke(rewritten_query)
     context = format_docs(docs)
 
     # 3) Answer

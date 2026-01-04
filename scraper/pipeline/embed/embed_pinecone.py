@@ -227,6 +227,7 @@ def embed_corpus_file(
             # Prepare batch for LangChain
             batch_texts.append(rec["text"])
             metadata = {
+                "text": rec["text"],
                 "type": rec["type"],
                 "title": rec["title"],
                 "section": rec["section"],

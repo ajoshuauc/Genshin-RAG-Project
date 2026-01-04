@@ -3,7 +3,7 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone
 
-from core.config import config
+from backend.core.config import config
 
 @lru_cache
 def get_llm() -> ChatOpenAI:
@@ -27,11 +27,9 @@ def get_pinecone_client() -> Pinecone:
 
 @lru_cache
 def get_vectorstore() -> PineconeVectorStore:
-
     """
     IMPORTANT: text_key must match what you used when upserting.
     We'll use "text" in the ingestion script below.
-    metadata_keys should match what you used when upserting.
     """
     pc = get_pinecone_client()
     index = pc.Index(config.PINECONE_INDEX_NAME)
@@ -39,8 +37,7 @@ def get_vectorstore() -> PineconeVectorStore:
     return PineconeVectorStore(
         index=index,
         embedding=get_embeddings(),
-        text_key="text",
-        metadata_keys=["type", "title", "section", "url", "lang", "content_type", "characters"]
+        text_key="text"
     )
 
 # def get_retriever() -> PineconeVectorStore:

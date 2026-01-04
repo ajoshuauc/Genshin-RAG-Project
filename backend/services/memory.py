@@ -1,12 +1,24 @@
 from langchain_classic.memory import ConversationSummaryBufferMemory
 from langchain_community.chat_message_histories import SQLChatMessageHistory
+from sqlalchemy import create_engine
 
 from backend.core.deps import get_llm
 from backend.core.config import config
 from backend.db.session_store import get_summary, update_summary, init_sessions_table
 
-#Ensure the sessions table exists
-init_sessions_table()
+# Lazy initialization - only call when actually needed
+_db_initialized = False
+
+def _ensure_db_initialized():
+    global _db_initialized
+    if not _db_initialized:
+        if not config.DATABASE_URL:
+            raise ValueError("DATABASE_URL is not set. Please set it in your .env file.")
+        try:
+            init_sessions_table()
+            _db_initialized = True
+        except Exception as e:
+            raise ConnectionError(f"Failed to connect to database: {e}. Make sure the database is running.")
 
 def get_memory(session_id: str) -> ConversationSummaryBufferMemory:
     """
@@ -14,8 +26,14 @@ def get_memory(session_id: str) -> ConversationSummaryBufferMemory:
     - raw messages are stored in Postgres by SQLChatMessageHistory
     - the rolling summary is loaded from / saved to our sessions table
     """
-
-    history = SQLChatMessageHistory(session_id=session_id, connection_string=config.DATABASE_URL)
+    # Ensure database is initialized before creating memory
+    _ensure_db_initialized()
+    
+    # Create SQLAlchemy engine for the new API
+    engine = create_engine(config.DATABASE_URL)
+    
+    # Use 'connection' instead of deprecated 'connection_string'
+    history = SQLChatMessageHistory(session_id=session_id, connection=engine)
 
     memory = ConversationSummaryBufferMemory(
         llm=get_llm(),
