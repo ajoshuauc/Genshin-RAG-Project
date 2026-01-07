@@ -1,7 +1,8 @@
 import os
+from pydantic import SecretStr
 
 class Config:
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "YOUR_KEY")
+    OPENAI_API_KEY: SecretStr = SecretStr(os.getenv("OPENAI_API_KEY", "YOUR_KEY"))
     LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
     EMB_MODEL: str = os.getenv("EMB_MODEL", "text-embedding-3-small")
 
