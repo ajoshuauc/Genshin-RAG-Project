@@ -325,7 +325,8 @@ def main():
     
     # Embed and upsert each corpus file
     jsonl_dir = os.path.join(data_dir, "jsonl")
-    for corpus in ["characters", "archon_quests", "story_quests", "world_quests", "books"]:
+    # for corpus in ["characters", "archon_quests", "story_quests", "world_quests", "books"]:
+    for corpus in ["books"]:
         path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
         embed_corpus_file(
             corpus=corpus,
@@ -337,28 +338,28 @@ def main():
             content_type="full"
         )
     
-    # Embed summaries from JSONL files (if they exist)
-    print(f"\n{'='*60}")
-    print("Embedding summaries...")
-    print(f"{'='*60}")
+    # # Embed summaries from JSONL files (if they exist)
+    # print(f"\n{'='*60}")
+    # print("Embedding summaries...")
+    # print(f"{'='*60}")
     
-    summary_corpus_list = [
-        "archon_quests_summaries",
-        "story_quests_summaries",
-        "world_quests_summaries",
-    ]
+    # summary_corpus_list = [
+    #     "archon_quests_summaries",
+    #     "story_quests_summaries",
+    #     "world_quests_summaries",
+    # ]
     
-    for corpus in summary_corpus_list:
-        path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
-        embed_corpus_file(
-            corpus=corpus,
-            path=path,
-            index=index,
-            embeddings=embeddings,
-            processed_ids=processed_ids,
-            progress_file=progress_file,
-            content_type="summary"
-        )
+    # for corpus in summary_corpus_list:
+    #     path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
+    #     embed_corpus_file(
+    #         corpus=corpus,
+    #         path=path,
+    #         index=index,
+    #         embeddings=embeddings,
+    #         processed_ids=processed_ids,
+    #         progress_file=progress_file,
+    #         content_type="summary"
+    #     )
 
 if __name__ == "__main__":
     main()
