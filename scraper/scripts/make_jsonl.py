@@ -29,6 +29,7 @@ def get_data_dir():
 data_dir = get_data_dir()
 SRC_DIR = os.path.join(data_dir, "interim")
 SUMMARIES_DIR = os.path.join(SRC_DIR, "summaries")
+MISC_DIR = os.path.join(SRC_DIR, "miscellaneous")
 DST_DIR = os.path.join(data_dir, "jsonl")
 
 # Global set to track all IDs across all files to ensure uniqueness
@@ -242,6 +243,56 @@ def process_summary_file(src: str, dst: str, corpus: str):
                 
                 fout.write(json.dumps(out, ensure_ascii=False) + "\n")
 
+def process_misc_file(src: str, dst: str, corpus: str):
+    """Process miscellaneous JSON file that contains a list of {url, text, <name>} records."""
+    global all_ids
+
+    with open(src, encoding="utf-8") as fin, open(dst, "w", encoding="utf-8") as fout:
+        records = json.load(fin)
+        if not isinstance(records, list):
+            raise ValueError(f"Expected a list in {src}, got {type(records).__name__}")
+
+        for rec_idx, rec in enumerate(records):
+            if not isinstance(rec, dict):
+                continue
+
+            title = (
+                rec.get("title")
+                or rec.get("name")
+                or rec.get("artifact")
+                or rec.get("character")
+                or rec.get("group")
+                or rec.get("faction")
+                or f"{corpus}:{rec_idx}"
+            )
+            url = rec.get("url") or rec.get("source_url") or ""
+            text = rec.get("text") or rec.get("summary") or rec.get("lore") or ""
+
+            if not str(text).strip():
+                continue
+
+            chunks = text_splitter.split_text(str(text))
+            for chunk_idx, chunk in enumerate(chunks):
+                if not chunk.strip():
+                    continue
+
+                title_slug = sanitize_title(str(title))
+                base_id = f"fandom:{corpus}:{title_slug}:misc:{chunk_idx}"
+                unique_id = create_unique_id(base_id)
+
+                out = {
+                    "id": unique_id,
+                    "type": corpus,
+                    "title": str(title),
+                    "section": "Misc",
+                    "source_url": url,
+                    "license": "CC BY-SA",
+                    "lang": "en",
+                    "text": chunk,
+                    "text_hash": hashlib.sha1(chunk.encode("utf-8")).hexdigest(),
+                }
+                fout.write(json.dumps(out, ensure_ascii=False) + "\n")
+
 def main():
     global all_ids
     
@@ -279,7 +330,24 @@ def main():
             process_summary_file(src, dst, corpus)
             print(f"✅ Wrote {dst} ({len([l for l in open(dst, encoding='utf-8')])} chunks)")
     
-    print(f"\n✅ Total unique IDs created: {len(all_ids)}")
+
+    # Process miscellaneous summary JSON files (non _summaries suffix)
+    if os.path.exists(MISC_DIR):
+        misc_files = []
+        for fname in os.listdir(MISC_DIR):
+            if fname.endswith(".json"):
+                misc_files.append(fname)
+
+        for fname in sorted(misc_files):
+            corpus = fname.replace(".json", "")
+            src = os.path.join(MISC_DIR, fname)
+            dst = os.path.join(DST_DIR, f"{corpus}.jsonl")
+            print(f"Processing {corpus} (misc summaries)...")
+            process_misc_file(src, dst, corpus)
+            print(f"Wrote {dst} ({len([l for l in open(dst, encoding='utf-8')])} chunks)")
+
+
+    print(f"\nTotal unique IDs created: {len(all_ids)}")
 
 if __name__ == "__main__":
     main()
