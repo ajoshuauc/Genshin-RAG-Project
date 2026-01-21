@@ -325,44 +325,46 @@ def main():
     
     # Embed and upsert each corpus file
     jsonl_dir = os.path.join(data_dir, "jsonl")
-    for corpus in ["characters", "archon_quests", "story_quests", "world_quests", "books"]:
-        path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
-        embed_corpus_file(
-            corpus=corpus,
-            path=path,
-            index=index,
-            embeddings=embeddings,
-            processed_ids=processed_ids,
-            progress_file=progress_file,
-            content_type="full"
-        )
+    # NOTE: Commented out to embed ONLY miscellaneous corpora.
+    # for corpus in ["characters", "archon_quests", "story_quests", "world_quests", "books"]:
+    #     path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
+    #     embed_corpus_file(
+    #         corpus=corpus,
+    #         path=path,
+    #         index=index,
+    #         embeddings=embeddings,
+    #         processed_ids=processed_ids,
+    #         progress_file=progress_file,
+    #         content_type="full"
+    #     )
     
     # Embed summaries from JSONL files (if they exist)
-    print(f"\n{'='*60}")
-    print("Embedding summaries...")
-    print(f"{'='*60}")
-    
-    summary_corpus_list = [
-        "archon_quests_summaries",
-        "story_quests_summaries",
-        "world_quests_summaries",
-    ]
-    
-    for corpus in summary_corpus_list:
-        path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
-        embed_corpus_file(
-            corpus=corpus,
-            path=path,
-            index=index,
-            embeddings=embeddings,
-            processed_ids=processed_ids,
-            progress_file=progress_file,
-            content_type="summary"
-        )
+    # NOTE: Commented out to embed ONLY miscellaneous corpora.
+    # print(f"\n{'='*60}")
+    # print("Embedding summaries...")
+    # print(f"{'='*60}")
+    #
+    # summary_corpus_list = [
+    #     "archon_quests_summaries",
+    #     "story_quests_summaries",
+    #     "world_quests_summaries",
+    # ]
+    #
+    # for corpus in summary_corpus_list:
+    #     path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
+    #     embed_corpus_file(
+    #         corpus=corpus,
+    #         path=path,
+    #         index=index,
+    #         embeddings=embeddings,
+    #         processed_ids=processed_ids,
+    #         progress_file=progress_file,
+    #         content_type="summary"
+    #     )
 
     # Embed miscellaneous from JSONL files (if they exist)
     print(f"\n{'='*60}")
-    print("Embedding summaries...")
+    print("Embedding miscellaneous...")
     print(f"{'='*60}")
 
     miscellaneous_corpus_list = [

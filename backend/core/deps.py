@@ -2,6 +2,7 @@ from functools import lru_cache
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone
+from langchain_cohere import CohereRerank
 
 from backend.core.config import config
 
@@ -38,6 +39,17 @@ def get_vectorstore() -> PineconeVectorStore:
         index=index,
         embedding=get_embeddings(),
         text_key="text"
+    )
+
+@lru_cache
+def get_reranker() -> CohereRerank:
+    if not config.COHERE_API_KEY:
+        raise ValueError("COHERE_API_KEY is not set")
+
+    return CohereRerank(
+        cohere_api_key=config.COHERE_API_KEY,
+        model="rerank-english-v3.0",
+        top_n=config.RERANK_TOP_N
     )
 
 # def get_retriever() -> PineconeVectorStore:

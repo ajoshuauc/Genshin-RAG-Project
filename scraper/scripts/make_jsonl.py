@@ -29,7 +29,7 @@ def get_data_dir():
 data_dir = get_data_dir()
 SRC_DIR = os.path.join(data_dir, "interim")
 SUMMARIES_DIR = os.path.join(SRC_DIR, "summaries")
-MISC_DIR = os.path.join(SRC_DIR, "miscellaneous")
+MISC_DIR = os.path.join(SRC_DIR, "misc")
 DST_DIR = os.path.join(data_dir, "jsonl")
 
 # Global set to track all IDs across all files to ensure uniqueness
