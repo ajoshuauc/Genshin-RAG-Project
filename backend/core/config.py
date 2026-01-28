@@ -3,7 +3,7 @@ from pydantic import SecretStr
 
 class Config:
     OPENAI_API_KEY: SecretStr = SecretStr(os.getenv("OPENAI_API_KEY", "YOUR_KEY"))
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-5-mini")
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
     EMB_MODEL: str = os.getenv("EMB_MODEL", "text-embedding-3-small")
 
     # Pinecone
@@ -21,7 +21,12 @@ class Config:
     INITIAL_RETRIEVAL_K: int = int(os.getenv("INITIAL_RETRIEVAL_K", "20"))  # For deep questions before reranking
     RERANK_TOP_N: int = int(os.getenv("RERANK_TOP_N", "12"))  # Final docs after reranking
 
+    # LLM Performance
+    LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1000"))  # Limit response length for faster generation
+    MAX_CONTEXT_LENGTH: int = int(os.getenv("MAX_CONTEXT_LENGTH", "16000"))  # Limit context characters
+
     # Memory
     MAX_TOKEN_LIMIT: int = int(os.getenv("MAX_TOKEN_LIMIT", "1000"))
+    MEMORY_LLM_MAX_TOKENS: int = int(os.getenv("MEMORY_LLM_MAX_TOKENS", "2000"))  # Higher limit for summary generation
 
 config = Config()

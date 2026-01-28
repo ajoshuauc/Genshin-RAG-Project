@@ -2,7 +2,7 @@ from langchain_classic.memory import ConversationSummaryBufferMemory
 from langchain_community.chat_message_histories import SQLChatMessageHistory
 from sqlalchemy import create_engine
 
-from backend.core.deps import get_llm
+from backend.core.deps import get_memory_llm
 from backend.core.config import config
 from backend.db.session_store import get_summary, update_summary, init_sessions_table
 
@@ -36,7 +36,7 @@ def get_memory(session_id: str) -> ConversationSummaryBufferMemory:
     history = SQLChatMessageHistory(session_id=session_id, connection=engine)
 
     memory = ConversationSummaryBufferMemory(
-        llm=get_llm(),
+        llm=get_memory_llm(),  # Use memory-specific LLM with higher max_tokens
         chat_memory=history,
         max_token_limit=config.MAX_TOKEN_LIMIT,
         return_messages=True,

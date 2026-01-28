@@ -226,6 +226,10 @@ def process_summary_file(src: str, dst: str, corpus: str):
                 # Ensure uniqueness
                 unique_id = create_unique_id(base_id)
                 
+                # Prepend quest title to chunk text for better retrieval
+                # This helps semantic search match queries like "Summarize Ignis Purgatorius Chapter"
+                chunk_with_title = f"Quest: {title}\n\n{chunk}"
+                
                 out = {
                     "id": unique_id,
                     "type": f"{corpus}_summaries",
@@ -234,8 +238,8 @@ def process_summary_file(src: str, dst: str, corpus: str):
                     "source_url": url,
                     "license": "CC BY-SA",
                     "lang": "en",
-                    "text": chunk,
-                    "text_hash": hashlib.sha1(chunk.encode("utf-8")).hexdigest(),
+                    "text": chunk_with_title,
+                    "text_hash": hashlib.sha1(chunk_with_title.encode("utf-8")).hexdigest(),
                 }
                 # Add characters list if available
                 if characters_list:
@@ -266,7 +270,7 @@ def process_misc_file(src: str, dst: str, corpus: str):
                 or f"{corpus}:{rec_idx}"
             )
             url = rec.get("url") or rec.get("source_url") or ""
-            text = rec.get("text") or rec.get("summary") or rec.get("lore") or ""
+            text = rec.get("text") or rec.get("summary") or rec.get("lore") or rec.get("content") or ""
 
             if not str(text).strip():
                 continue
@@ -280,6 +284,15 @@ def process_misc_file(src: str, dst: str, corpus: str):
                 base_id = f"fandom:{corpus}:{title_slug}:misc:{chunk_idx}"
                 unique_id = create_unique_id(base_id)
 
+                # Prepend title to chunk text for book_collections_summaries only
+                # This helps semantic search match queries mentioning the book/collection title
+                if corpus == "book_collections_summaries":
+                    chunk_with_title = f"Book: {title}\n\n{chunk}"
+                    text_for_hash = chunk_with_title
+                else:
+                    chunk_with_title = chunk
+                    text_for_hash = chunk
+
                 out = {
                     "id": unique_id,
                     "type": corpus,
@@ -288,8 +301,8 @@ def process_misc_file(src: str, dst: str, corpus: str):
                     "source_url": url,
                     "license": "CC BY-SA",
                     "lang": "en",
-                    "text": chunk,
-                    "text_hash": hashlib.sha1(chunk.encode("utf-8")).hexdigest(),
+                    "text": chunk_with_title,
+                    "text_hash": hashlib.sha1(text_for_hash.encode("utf-8")).hexdigest(),
                 }
                 fout.write(json.dumps(out, ensure_ascii=False) + "\n")
 
@@ -301,34 +314,34 @@ def main():
     # Reset global ID tracker
     all_ids.clear()
     
-    # Process NDJSON files
-    ndjson_files = []
-    for fname in os.listdir(SRC_DIR):
-        if fname.endswith(".ndjson"):
-            ndjson_files.append(fname)
+    # # Process NDJSON files
+    # ndjson_files = []
+    # for fname in os.listdir(SRC_DIR):
+    #     if fname.endswith(".ndjson"):
+    #         ndjson_files.append(fname)
     
-    for fname in sorted(ndjson_files):
-        corpus = fname.replace(".ndjson", "")
-        src = os.path.join(SRC_DIR, fname)
-        dst = os.path.join(DST_DIR, f"{corpus}.jsonl")
-        print(f"📝 Processing {corpus}...")
-        process_ndjson_file(src, dst, corpus)
-        print(f"✅ Wrote {dst} ({len([l for l in open(dst, encoding='utf-8')])} chunks)")
+    # for fname in sorted(ndjson_files):
+    #     corpus = fname.replace(".ndjson", "")
+    #     src = os.path.join(SRC_DIR, fname)
+    #     dst = os.path.join(DST_DIR, f"{corpus}.jsonl")
+    #     print(f"📝 Processing {corpus}...")
+    #     process_ndjson_file(src, dst, corpus)
+    #     print(f"✅ Wrote {dst} ({len([l for l in open(dst, encoding='utf-8')])} chunks)")
     
-    # Process summary JSON files
-    if os.path.exists(SUMMARIES_DIR):
-        summary_files = []
-        for fname in os.listdir(SUMMARIES_DIR):
-            if fname.endswith("_summaries.json"):
-                summary_files.append(fname)
+    # # Process summary JSON files
+    # if os.path.exists(SUMMARIES_DIR):
+    #     summary_files = []
+    #     for fname in os.listdir(SUMMARIES_DIR):
+    #         if fname.endswith("_summaries.json"):
+    #             summary_files.append(fname)
         
-        for fname in sorted(summary_files):
-            corpus = fname.replace("_summaries.json", "")
-            src = os.path.join(SUMMARIES_DIR, fname)
-            dst = os.path.join(DST_DIR, f"{corpus}_summaries.jsonl")
-            print(f"📝 Processing {corpus} summaries...")
-            process_summary_file(src, dst, corpus)
-            print(f"✅ Wrote {dst} ({len([l for l in open(dst, encoding='utf-8')])} chunks)")
+    #     for fname in sorted(summary_files):
+    #         corpus = fname.replace("_summaries.json", "")
+    #         src = os.path.join(SUMMARIES_DIR, fname)
+    #         dst = os.path.join(DST_DIR, f"{corpus}_summaries.jsonl")
+    #         print(f"📝 Processing {corpus} summaries...")
+    #         process_summary_file(src, dst, corpus)
+    #         print(f"✅ Wrote {dst} ({len([l for l in open(dst, encoding='utf-8')])} chunks)")
     
 
     # Process miscellaneous summary JSON files (non _summaries suffix)

@@ -11,14 +11,31 @@ def get_llm() -> ChatOpenAI:
     return ChatOpenAI(
         api_key=config.OPENAI_API_KEY,
         model=config.LLM_MODEL, 
-        temperature=0
+        temperature=0,
+        max_tokens=config.LLM_MAX_TOKENS,  # Limit response length for faster generation
+        timeout=60.0  # Timeout to fail fast if too slow
+    )
+
+@lru_cache
+def get_memory_llm() -> ChatOpenAI:
+    """
+    Separate LLM instance for memory summarization with higher max_tokens.
+    This allows summaries to be longer without affecting regular response generation.
+    """
+    return ChatOpenAI(
+        api_key=config.OPENAI_API_KEY,
+        model=config.LLM_MODEL,
+        temperature=0,
+        max_tokens=config.MEMORY_LLM_MAX_TOKENS,  # Higher limit for summary generation
+        timeout=60.0
     )
 
 @lru_cache
 def get_embeddings() -> OpenAIEmbeddings:
     return OpenAIEmbeddings(
         api_key=config.OPENAI_API_KEY,
-        model=config.EMB_MODEL
+        model=config.EMB_MODEL,
+        dimensions=1536  # Match the dimension used in embedding script
     )
 
 @lru_cache

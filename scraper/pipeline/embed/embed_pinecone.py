@@ -10,6 +10,9 @@ from langchain_openai import OpenAIEmbeddings
 from pinecone import Pinecone, ServerlessSpec
 from tqdm import tqdm
 
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+
 load_dotenv()
 EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
 
@@ -293,12 +296,20 @@ def embed_corpus_file(
 def main():
     # Initialize Pinecone
     pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
-    index_name = os.environ.get("PINECONE_INDEX_NAME", "genshin-lore")
+    index_name = "paimon-gpt"
+
     
     # Get embedding dimension based on model
-    # text-embedding-3-small: 1536 dimensions
+    # text-embedding-3-small: 1536 dimensions (default), but can be reduced to 512
     # text-embedding-3-large: 3072 dimensions
-    dimension = 1536 if "small" in EMBED_MODEL.lower() else 3072
+    # text-embedding-ada-002: 1536 dimensions
+    if "small" in EMBED_MODEL.lower():
+        dimension = 1536  # Using reduced dimensions for text-embedding-3-small
+    elif "large" in EMBED_MODEL.lower():
+        dimension = 3072
+    else:
+        # Default to 512 for text-embedding-3-small
+        dimension = 1536
     
     if index_name not in pc.list_indexes().names():
         pc.create_index(
@@ -311,8 +322,8 @@ def main():
     
     index = pc.Index(index_name)
     
-    # Initialize LangChain embeddings
-    embeddings = OpenAIEmbeddings(model=EMBED_MODEL)
+    # Initialize LangChain embeddings with reduced dimensions
+    embeddings = OpenAIEmbeddings(model=EMBED_MODEL, dimensions=1536)
     
     # Initialize progress tracking
     data_dir = get_data_dir()
@@ -325,8 +336,9 @@ def main():
     
     # Embed and upsert each corpus file
     jsonl_dir = os.path.join(data_dir, "jsonl")
-    # NOTE: Commented out to embed ONLY miscellaneous corpora.
-    # for corpus in ["characters", "archon_quests", "story_quests", "world_quests", "books"]:
+    # NOTE: Excluding "archon_quests", "story_quests", "world_quests" - will be re-embedded separately
+    # NOTE: This entire section is commented out to exclude "characters" and "books" from embedding
+    # for corpus in ["characters", "books"]:
     #     path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
     #     embed_corpus_file(
     #         corpus=corpus,
@@ -339,17 +351,17 @@ def main():
     #     )
     
     # Embed summaries from JSONL files (if they exist)
-    # NOTE: Commented out to embed ONLY miscellaneous corpora.
+    # # NOTE: Commented out to embed ONLY miscellaneous corpora.
     # print(f"\n{'='*60}")
     # print("Embedding summaries...")
     # print(f"{'='*60}")
-    #
+    
     # summary_corpus_list = [
     #     "archon_quests_summaries",
     #     "story_quests_summaries",
     #     "world_quests_summaries",
     # ]
-    #
+    
     # for corpus in summary_corpus_list:
     #     path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
     #     embed_corpus_file(
@@ -368,12 +380,15 @@ def main():
     print(f"{'='*60}")
 
     miscellaneous_corpus_list = [
-        "artifact_lore",
-        "groups_lore",
-        "teyvat_lore",
-        "playable_characters",
-        "book_collections_summaries"
-    ]
+    # "artifact_lore",
+    # "groups_lore",
+    # "teyvat_lore",
+    # "playable_characters",
+    # "book_collections_summaries",
+    "fatui",
+    "shades",
+    "cataclysm_summary"
+]
 
     for corpus in miscellaneous_corpus_list:
         path = os.path.join(jsonl_dir, f"{corpus}.jsonl")
