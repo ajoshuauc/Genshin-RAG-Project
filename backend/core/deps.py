@@ -1,10 +1,26 @@
 from functools import lru_cache
+from uuid import UUID
+from fastapi import Header, HTTPException
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone
 from langchain_cohere import CohereRerank
 
 from backend.core.config import config
+
+
+# ---------------------------------------------------------------------------
+# X-User-Id dependency (anonymous user scoping)
+# ---------------------------------------------------------------------------
+def get_user_id(x_user_id: str = Header(..., alias="X-User-Id")) -> UUID:
+    """
+    FastAPI dependency that extracts and validates the X-User-Id header.
+    Returns a UUID. Raises 400 if missing or invalid.
+    """
+    try:
+        return UUID(x_user_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=400, detail="Invalid or missing X-User-Id header (must be UUID)")
 
 @lru_cache
 def get_llm() -> ChatOpenAI:

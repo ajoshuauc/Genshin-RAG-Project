@@ -2,10 +2,9 @@
 
 import { useState, useCallback } from "react";
 import { Message, Conversation } from "../types";
-import {
-  createMessage,
-  generatePlaceholderResponse,
-} from "../lib/placeholders";
+import { createMessage } from "../lib/placeholders";
+import { getOrCreateUserId } from "@/lib/sessions/user";
+import { apiRepo } from "@/lib/sessions/apiRepo";
 
 interface UseChatOptions {
   activeConversation: Conversation | null;
@@ -26,6 +25,12 @@ export function useChat({
     async (content: string) => {
       if (!content.trim()) return;
 
+      const userId = getOrCreateUserId();
+      if (!userId) {
+        console.error("No user ID available");
+        return;
+      }
+
       // If no active conversation, create one
       let conversation = activeConversation;
       if (!conversation) {
@@ -35,7 +40,7 @@ export function useChat({
       const userMessage = createMessage("user", content.trim());
       const isFirstMessage = conversation.messages.length === 0;
 
-      // Add user message immediately
+      // Add user message immediately (optimistic update)
       const updatedMessages = [...conversation.messages, userMessage];
       updateConversation(conversation.id, { messages: updatedMessages });
 
@@ -47,20 +52,34 @@ export function useChat({
       // Show typing indicator
       setIsTyping(true);
 
-      // Simulate assistant response delay (200-600ms)
-      const delay = 200 + Math.random() * 400;
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      try {
+        // Call the backend API
+        const response = await apiRepo.sendChatMessage(
+          userId,
+          conversation.id, // This is the session_id
+          content.trim()
+        );
 
-      // Generate placeholder response
-      const responseContent = generatePlaceholderResponse(content);
-      const assistantMessage = createMessage("assistant", responseContent);
+        // Create assistant message from response
+        const assistantMessage = createMessage("assistant", response.response);
 
-      // Add assistant message
-      updateConversation(conversation.id, {
-        messages: [...updatedMessages, assistantMessage],
-      });
-
-      setIsTyping(false);
+        // Add assistant message
+        updateConversation(conversation.id, {
+          messages: [...updatedMessages, assistantMessage],
+        });
+      } catch (error) {
+        console.error("Failed to send message:", error);
+        // Add error message
+        const errorMessage = createMessage(
+          "assistant",
+          "Sorry, I encountered an error. Please try again."
+        );
+        updateConversation(conversation.id, {
+          messages: [...updatedMessages, errorMessage],
+        });
+      } finally {
+        setIsTyping(false);
+      }
     },
     [activeConversation, updateConversation, updateConversationTitle, createConversation]
   );

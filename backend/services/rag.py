@@ -222,12 +222,13 @@ def build_answer_chain():
 def answer_with_rag(session_id: str, user_message: str) -> tuple[str, list]:
     memory = get_memory(session_id)
 
-    # Load memory variables
-    mem_vars = memory.load_memory_variables({})
-    history_msgs = mem_vars.get("history", [])
+    # Keep more recent messages: take last N from full chat history (not just buffer)
+    all_messages = memory.chat_memory.messages
+    n = config.RECENT_CHAT_MESSAGES_COUNT
+    recent_msgs = all_messages[-n:] if len(all_messages) > n else all_messages
 
     chat_history_str = ""
-    for m in history_msgs:
+    for m in recent_msgs:
         if m.type == "human":
             chat_history_str += f"User: {m.content}\n"
         elif m.type == "ai":

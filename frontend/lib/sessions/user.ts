@@ -1,36 +1,43 @@
 /**
  * User ID management for per-browser sessions.
- * STUB: Currently returns a placeholder. Will be wired to localStorage later.
+ * Stores a UUID in localStorage to identify anonymous users.
  */
 
-const PLACEHOLDER_USER_ID = "demo-user-12345";
+const USER_ID_KEY = "genshin:userId";
 
 /**
  * Get or create a user ID for the current browser session.
- * 
- * Future implementation:
- * - Check localStorage for existing user ID
- * - If not found, generate a new UUID and store it
- * - Return the user ID
+ * Uses crypto.randomUUID() for UUID generation.
  */
 export function getOrCreateUserId(): string {
-  // STUB: Return placeholder for now
-  // Future: read from localStorage, generate if missing
-  return PLACEHOLDER_USER_ID;
+  if (typeof window === "undefined") {
+    // SSR fallback - return empty, will be set on client
+    return "";
+  }
+
+  let userId = localStorage.getItem(USER_ID_KEY);
+  if (!userId) {
+    userId = crypto.randomUUID();
+    localStorage.setItem(USER_ID_KEY, userId);
+  }
+  return userId;
 }
 
 /**
  * Clear the user ID (for testing/reset purposes).
  */
 export function clearUserId(): void {
-  // STUB: Not implemented
-  throw new Error("clearUserId: Not implemented");
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(USER_ID_KEY);
+  }
 }
 
 /**
  * Check if user ID exists in storage.
  */
 export function hasUserId(): boolean {
-  // STUB: Return true for now
-  return true;
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return localStorage.getItem(USER_ID_KEY) !== null;
 }

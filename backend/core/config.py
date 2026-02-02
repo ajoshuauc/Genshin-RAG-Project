@@ -13,8 +13,13 @@ class Config:
     # Cohere
     COHERE_API_KEY: str = os.getenv("COHERE_API_KEY", "YOUR_KEY")
 
-    # Postgres
+    # Postgres (async: postgresql+asyncpg://...)
     DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+
+    # CORS
+    CORS_ALLOW_ORIGINS: list[str] = os.getenv(
+        "CORS_ALLOW_ORIGINS", "http://localhost:3000"
+    ).split(",")
 
     # Retrieval
     TOP_K: int = int(os.getenv("TOP_K", "20"))
@@ -28,5 +33,6 @@ class Config:
     # Memory
     MAX_TOKEN_LIMIT: int = int(os.getenv("MAX_TOKEN_LIMIT", "1000"))
     MEMORY_LLM_MAX_TOKENS: int = int(os.getenv("MEMORY_LLM_MAX_TOKENS", "2000"))  # Higher limit for summary generation
+    RECENT_CHAT_MESSAGES_COUNT: int = int(os.getenv("RECENT_CHAT_MESSAGES_COUNT", "12"))  # Last N messages (e.g. 12 = 6 exchanges) in RAG context
 
 config = Config()

@@ -6,8 +6,7 @@ export interface Message {
 }
 
 export interface Conversation {
-  id: string;
-  sessionId: string;
+  id: string; // This is the session_id (UUID) - unified with backend
   title: string;
   messages: Message[];
   createdAt: Date;
@@ -15,7 +14,7 @@ export interface Conversation {
 }
 
 export interface ChatRequest {
-  sessionId: string;
+  session_id: string;
   message: string;
 }
 
