@@ -5,7 +5,7 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone
 from langchain_cohere import CohereRerank
-
+from pydantic import SecretStr
 from backend.core.config import config
 
 
@@ -23,26 +23,32 @@ def get_user_id(x_user_id: str = Header(..., alias="X-User-Id")) -> UUID:
         raise HTTPException(status_code=400, detail="Invalid or missing X-User-Id header (must be UUID)")
 
 @lru_cache
-def get_llm() -> ChatOpenAI:
+def get_llm_simple() -> ChatOpenAI:
     return ChatOpenAI(
         api_key=config.OPENAI_API_KEY,
-        model=config.LLM_MODEL, 
+        model=config.LLM_MODEL_SIMPLE,
         temperature=0,
-        max_tokens=config.LLM_MAX_TOKENS,  # Limit response length for faster generation
-        timeout=60.0  # Timeout to fail fast if too slow
+        max_completion_tokens=config.LLM_MAX_TOKENS,
+        timeout=60.0
+    )
+
+@lru_cache
+def get_llm_deep() -> ChatOpenAI:
+    return ChatOpenAI(
+        api_key=config.OPENAI_API_KEY,
+        model=config.LLM_MODEL_DEEP,
+        max_completion_tokens=config.LLM_MAX_TOKENS,
+        timeout=60.0
     )
 
 @lru_cache
 def get_memory_llm() -> ChatOpenAI:
-    """
-    Separate LLM instance for memory summarization with higher max_tokens.
-    This allows summaries to be longer without affecting regular response generation.
-    """
+    """Separate LLM instance for memory summarization with higher max_tokens."""
     return ChatOpenAI(
         api_key=config.OPENAI_API_KEY,
-        model=config.LLM_MODEL,
+        model=config.LLM_MODEL_SIMPLE,
         temperature=0,
-        max_tokens=config.MEMORY_LLM_MAX_TOKENS,  # Higher limit for summary generation
+        max_completion_tokens=config.MEMORY_LLM_MAX_TOKENS,
         timeout=60.0
     )
 
@@ -80,7 +86,7 @@ def get_reranker() -> CohereRerank:
         raise ValueError("COHERE_API_KEY is not set")
 
     return CohereRerank(
-        cohere_api_key=config.COHERE_API_KEY,
+        cohere_api_key=SecretStr(config.COHERE_API_KEY),
         model="rerank-english-v3.0",
         top_n=config.RERANK_TOP_N
     )

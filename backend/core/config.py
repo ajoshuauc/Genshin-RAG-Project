@@ -3,7 +3,8 @@ from pydantic import SecretStr
 
 class Config:
     OPENAI_API_KEY: SecretStr = SecretStr(os.getenv("OPENAI_API_KEY", "YOUR_KEY"))
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
+    LLM_MODEL_SIMPLE: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
+    LLM_MODEL_DEEP: str = os.getenv("LLM_MODEL_DEEP", "gpt-5-mini")
     EMB_MODEL: str = os.getenv("EMB_MODEL", "text-embedding-3-small")
 
     # Pinecone
@@ -22,12 +23,11 @@ class Config:
     ).split(",")
 
     # Retrieval
-    TOP_K: int = int(os.getenv("TOP_K", "20"))
-    INITIAL_RETRIEVAL_K: int = int(os.getenv("INITIAL_RETRIEVAL_K", "20"))  # For deep questions before reranking
-    RERANK_TOP_N: int = int(os.getenv("RERANK_TOP_N", "12"))  # Final docs after reranking
+    INITIAL_RETRIEVAL_K: int = int(os.getenv("INITIAL_RETRIEVAL_K", "10"))  # For deep questions before reranking
+    RERANK_TOP_N: int = int(os.getenv("RERANK_TOP_N", "3"))  # Final docs after reranking
 
     # LLM Performance
-    LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "1000"))  # Limit response length for faster generation
+    LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "3000"))  # Limit response length for faster generation
     MAX_CONTEXT_LENGTH: int = int(os.getenv("MAX_CONTEXT_LENGTH", "16000"))  # Limit context characters
 
     # Memory
