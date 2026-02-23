@@ -95,6 +95,13 @@ export function useConversations() {
     (conversationId: string, firstMessage: string) => {
       const title = deriveTitleFromMessage(firstMessage);
       updateConversation(conversationId, { title });
+
+      const userId = getOrCreateUserId();
+      if (userId) {
+        apiRepo.renameSession(userId, conversationId, title).catch((err) => {
+          console.error("Failed to persist session title:", err);
+        });
+      }
     },
     [updateConversation]
   );

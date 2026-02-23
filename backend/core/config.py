@@ -22,16 +22,19 @@ class Config:
         "CORS_ALLOW_ORIGINS", "http://localhost:3000"
     ).split(",")
 
-    # Retrieval
-    INITIAL_RETRIEVAL_K: int = int(os.getenv("INITIAL_RETRIEVAL_K", "10"))  # For deep questions before reranking
-    RERANK_TOP_N: int = int(os.getenv("RERANK_TOP_N", "3"))  # Final docs after reranking
+    # Retrieval — simple
+    SIMPLE_RETRIEVAL_K: int = int(os.getenv("SIMPLE_RETRIEVAL_K", "10"))
+    SIMPLE_RERANK_TOP_N: int = int(os.getenv("SIMPLE_RERANK_TOP_N", "3"))
+    # Retrieval — deep (wider net, more docs survive rerank)
+    DEEP_RETRIEVAL_K: int = int(os.getenv("DEEP_RETRIEVAL_K", "12"))
+    DEEP_RERANK_TOP_N: int = int(os.getenv("DEEP_RERANK_TOP_N", "4"))
 
     # LLM Performance
-    LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "3000"))  # Limit response length for faster generation
+    LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "2500"))  # Limit response length for faster generation
     MAX_CONTEXT_LENGTH: int = int(os.getenv("MAX_CONTEXT_LENGTH", "16000"))  # Limit context characters
 
     # Memory
-    MAX_TOKEN_LIMIT: int = int(os.getenv("MAX_TOKEN_LIMIT", "1000"))
+    MAX_TOKEN_LIMIT: int = int(os.getenv("MAX_TOKEN_LIMIT", "3000"))
     MEMORY_LLM_MAX_TOKENS: int = int(os.getenv("MEMORY_LLM_MAX_TOKENS", "2000"))  # Higher limit for summary generation
     RECENT_CHAT_MESSAGES_COUNT: int = int(os.getenv("RECENT_CHAT_MESSAGES_COUNT", "12"))  # Last N messages (e.g. 12 = 6 exchanges) in RAG context
 

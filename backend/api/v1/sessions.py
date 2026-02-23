@@ -6,6 +6,7 @@ from backend.models.schemas import (
     SessionListResponse,
     SessionSummary,
     SessionTranscriptResponse,
+    RenameSessionRequest,
     MessageOut,
     ChatRole,
 )
@@ -37,6 +38,25 @@ async def list_sessions(
             for s in sessions
         ]
     )
+
+
+@router.patch("/sessions/{session_id}")
+async def rename_session(
+    session_id: UUID,
+    body: RenameSessionRequest,
+    user_id: UUID = Depends(get_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Rename a session. Only the owning user may rename it.
+    """
+    updated = await chat_repo.update_session_title(
+        db, session_id, user_id, body.title
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await db.commit()
+    return {"ok": True}
 
 
 @router.get("/sessions/{session_id}", response_model=SessionTranscriptResponse)

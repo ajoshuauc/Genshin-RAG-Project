@@ -3,8 +3,8 @@ Async data-access layer for chat persistence (users, sessions, messages).
 """
 from uuid import UUID
 from datetime import datetime
-from typing import Optional
-from sqlalchemy import bindparam, text
+from typing import Optional, cast
+from sqlalchemy import CursorResult, bindparam, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -85,6 +85,26 @@ async def touch_session(db: AsyncSession, session_id: UUID) -> None:
         text("UPDATE chat_sessions SET updated_at = now() WHERE id = :session_id"),
         {"session_id": session_id},
     )
+
+
+async def update_session_title(
+    db: AsyncSession, session_id: UUID, user_id: UUID, title: str
+) -> bool:
+    """
+    Update a session's title. Returns False if session not found or not owned.
+    """
+    result = cast(
+        CursorResult,
+        await db.execute(
+            text("""
+                UPDATE chat_sessions
+                SET title = :title, updated_at = now()
+                WHERE id = :session_id AND user_id = :user_id AND deleted_at IS NULL
+            """),
+            {"title": title, "session_id": session_id, "user_id": user_id},
+        ),
+    )
+    return result.rowcount > 0
 
 
 async def list_sessions(db: AsyncSession, user_id: UUID) -> list[dict]:

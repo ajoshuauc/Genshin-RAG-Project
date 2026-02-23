@@ -125,12 +125,19 @@ export class ApiSessionsRepository implements SessionsRepository {
   }
 
   async renameSession(
-    _userId: string,
-    _sessionId: string,
-    _title: string
+    userId: string,
+    sessionId: string,
+    title: string
   ): Promise<void> {
-    // Not implemented yet - would need a PATCH endpoint
-    console.warn("renameSession: Not implemented on backend yet");
+    const res = await fetch(`${this.baseUrl}/api/v1/sessions/${sessionId}`, {
+      method: "PATCH",
+      headers: this.headers(userId),
+      body: JSON.stringify({ title }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to rename session: ${res.status}`);
+    }
   }
 
   async deleteSession(_userId: string, _sessionId: string): Promise<void> {

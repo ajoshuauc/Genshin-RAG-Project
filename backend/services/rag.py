@@ -9,114 +9,109 @@ from backend.services.utils import format_docs
 from backend.services.memory import get_memory, persist_memory
 
 
-def classify_query_complexity(question: str) -> dict:
-    """
-    Classify if a question is 'simple' or 'deep/complex'.
-    Returns dict with 'complexity' and 'reasoning'.
-    """
+def classify_query(question: str) -> dict:
+    """Classify a standalone question as 'simple' or 'deep'. Used for first messages only."""
     llm = get_llm_simple()
     prompt = ChatPromptTemplate.from_template(
         """Classify this Genshin Impact lore question as either 'simple' or 'deep'.
 
-        A 'simple' question:
-        - Asks for a straightforward fact (e.g., "Who is Zhongli?", "What is Mondstadt?")
-        - Has a direct answer in the lore
-        - Requires basic retrieval only
-
-        A 'deep' question:
-        - Requires analysis, comparison, or synthesis (e.g., "How does Raiden's philosophy differ from Venti's?")
-        - Asks about relationships, motivations, or complex themes
-        - Needs precise document ranking to find the most relevant information
-        - May require connecting information across multiple sources
+        simple: straightforward fact lookup (e.g., "Who is Zhongli?", "What is Mondstadt?")
+        deep: requires analysis, comparison, synthesis, or connecting multiple sources
+              (e.g., "How does Ei's ideal of eternity compare to Zhongli's idea of contracts?")
 
         Question: {question}
 
-        Respond with JSON:
-        {{
-            "complexity": "simple" or "deep",
-            "reasoning": "brief explanation"
-        }}"""
+        Respond with JSON only:
+        {{"complexity": "simple" or "deep", "reasoning": "one sentence"}}"""
     )
-    
     chain = prompt | llm | StrOutputParser()
     response = chain.invoke({"question": question})
-    
+
     try:
-        # Try to parse JSON response
-        result = json.loads(response)
-    except:
-        # Fallback: check if response contains keywords
+        return json.loads(response)
+    except json.JSONDecodeError:
         if "deep" in response.lower():
-            result = {"complexity": "deep", "reasoning": response}
-        else:
-            result = {"complexity": "simple", "reasoning": response}
-    
-    return result
+            return {"complexity": "deep", "reasoning": response}
+        return {"complexity": "simple", "reasoning": response}
+
+
+def rewrite_and_classify(user_message: str, chat_history: str, summary: str) -> dict:
+    """Rewrite a follow-up into a standalone search query AND classify complexity in one call."""
+    llm = get_llm_simple()
+    prompt = ChatPromptTemplate.from_template(
+        """You are a Genshin Impact lore search assistant.
+
+Given conversation context and a user message, do TWO things:
+
+1. REWRITE the user's message into a standalone search query optimized for
+   retrieving Genshin Impact lore. Resolve all pronouns and references
+   ("he", "she", "it", "that", "more detail", etc.) using the conversation
+   context. Use canonical Genshin terms — character titles (e.g. "Raiden
+   Shogun" not "the electro archon lady"), region names (Mondstadt, Liyue,
+   Inazuma, Sumeru, Fontaine, Natlan, Snezhnaya), faction names (Fatui,
+   Knights of Favonius, Abyss Order), and item/concept names as they appear
+   in-game.
+
+2. CLASSIFY the query complexity:
+   - "simple": straightforward fact lookup (e.g., "Who is Zhongli?")
+   - "deep": requires analysis, comparison, synthesis, or connecting
+     multiple sources (e.g., "How does Ei's ideal of eternity compare to
+     Zhongli's idea of contracts?")
+
+CONVERSATION SUMMARY:
+{summary}
+
+RECENT CHAT:
+{chat_history}
+
+USER MESSAGE: {question}
+
+Respond with JSON only:
+{{"rewritten_query": "...", "complexity": "simple" or "deep", "reasoning": "one sentence"}}"""
+    )
+    chain = prompt | llm | StrOutputParser()
+    response = chain.invoke({
+        "summary": summary or "(none)",
+        "chat_history": chat_history or "(none)",
+        "question": user_message,
+    }).strip()
+
+    try:
+        return json.loads(response)
+    except json.JSONDecodeError:
+        return {
+            "rewritten_query": user_message,
+            "complexity": "deep" if "deep" in response.lower() else "simple",
+            "reasoning": response,
+        }
 
 def build_simple_retriever():
-    """Fast retrieval for simple questions - uses reranking for precision"""
+    """Fast retrieval for simple questions — k=10, rerank top 3."""
     vs = get_vectorstore()
-    
     base_retriever = vs.as_retriever(
-        search_kwargs={"k": config.INITIAL_RETRIEVAL_K}
+        search_kwargs={"k": config.SIMPLE_RETRIEVAL_K}
     )
-    
-    reranker = get_reranker()
-    retriever = ContextualCompressionRetriever(
-        base_compressor=reranker,
-        base_retriever=base_retriever
+    reranker = get_reranker(top_n=config.SIMPLE_RERANK_TOP_N)
+    return ContextualCompressionRetriever(
+        base_compressor=reranker, base_retriever=base_retriever
     )
-    
-    return retriever
 
 def build_deep_retriever():
-    """Precise retrieval for deep questions - uses reranking for accuracy"""
+    """Wider retrieval for deep questions — k=15, rerank top 5."""
     vs = get_vectorstore()
-    
     base_retriever = vs.as_retriever(
-        search_kwargs={"k": config.INITIAL_RETRIEVAL_K}
+        search_kwargs={"k": config.DEEP_RETRIEVAL_K}
     )
-    
-    # Add reranking for precision (using Cohere - fast and accurate)
-    reranker = get_reranker()
-    retriever = ContextualCompressionRetriever(
-        base_compressor=reranker,
-        base_retriever=base_retriever
+    reranker = get_reranker(top_n=config.DEEP_RERANK_TOP_N)
+    return ContextualCompressionRetriever(
+        base_compressor=reranker, base_retriever=base_retriever
     )
-    
-    return retriever
 
 def build_retriever(complexity: str = "simple"):
     """Route to appropriate retriever based on query complexity."""
     if complexity == "deep":
         return build_deep_retriever()
-    else:
-        return build_simple_retriever()
-
-def rewrite_query(user_message: str, chat_history: str, summary: str) -> str:
-    """Rewrite a follow-up message into a standalone search query using conversation context."""
-    llm = get_llm_simple()
-    prompt = ChatPromptTemplate.from_template(
-        """Rewrite the user's latest message into a single standalone search query
-            that captures the full intent, using the conversation context to resolve
-            references like "he", "she", "it", "that", "more detail", etc.
-
-            CONVERSATION SUMMARY:
-            {summary}
-
-            RECENT CHAT:
-            {chat_history}
-
-            USER MESSAGE: {question}
-
-            Return ONLY the rewritten query, nothing else."""
-    )
-    chain = prompt | llm | StrOutputParser()
-    return chain.invoke({
-        "summary": summary or "(none)",
-        "chat_history": chat_history or "(none)",
-        "question": user_message,
-    }).strip()
+    return build_simple_retriever()
 
 
 def build_answer_chain(llm):
@@ -167,15 +162,20 @@ def answer_with_rag(session_id: str, user_message: str) -> tuple[str, list]:
 
     summary = memory.moving_summary_buffer or ""
 
-    # 1) Rewrite query to be standalone using conversation context
-    search_query = rewrite_query(user_message, chat_history_str, summary)
-    print(f"DEBUG: Rewritten query: {search_query}")
+    is_first_message = len(all_messages) == 0
 
-    # 2) Classify query complexity
-    classification = classify_query_complexity(search_query)
-    complexity = classification.get("complexity", "simple")
-    
-    print(f"DEBUG: Query classified as '{complexity}': {classification.get('reasoning', '')}")
+    if is_first_message:
+        search_query = user_message
+        classification = classify_query(user_message)
+        complexity = classification.get("complexity", "simple")
+        print(f"DEBUG: First message — skipped rewrite")
+    else:
+        result = rewrite_and_classify(user_message, chat_history_str, summary)
+        search_query = result["rewritten_query"]
+        complexity = result.get("complexity", "simple")
+        print(f"DEBUG: Rewritten query: {search_query}")
+
+    print(f"DEBUG: Query classified as '{complexity}'")
 
     # 3) Select LLM based on complexity
     llm = get_llm_deep() if complexity == "deep" else get_llm_simple()

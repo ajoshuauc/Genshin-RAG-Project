@@ -27,6 +27,10 @@ class ChatResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Sessions endpoints
 # ---------------------------------------------------------------------------
+class RenameSessionRequest(BaseModel):
+    title: str
+
+
 class SessionSummary(BaseModel):
     id: UUID
     title: str

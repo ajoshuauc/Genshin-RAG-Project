@@ -81,16 +81,15 @@ def get_vectorstore() -> PineconeVectorStore:
     )
 
 @lru_cache
-def get_reranker() -> CohereRerank:
+def get_reranker(top_n: int = 3) -> CohereRerank:
     if not config.COHERE_API_KEY:
         raise ValueError("COHERE_API_KEY is not set")
 
     return CohereRerank(
         cohere_api_key=SecretStr(config.COHERE_API_KEY),
         model="rerank-english-v3.0",
-        top_n=config.RERANK_TOP_N
+        top_n=top_n,
     )
-
 # def get_retriever() -> PineconeVectorStore:
 #     vectorstore = get_vectorstore()
 #     return vectorstore.as_retriever(search_kwargs={"k": config.TOP_K})

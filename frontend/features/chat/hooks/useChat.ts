@@ -44,21 +44,21 @@ export function useChat({
       const updatedMessages = [...conversation.messages, userMessage];
       updateConversation(conversation.id, { messages: updatedMessages });
 
-      // Update title if this is the first message
-      if (isFirstMessage) {
-        updateConversationTitle(conversation.id, content.trim());
-      }
-
       // Show typing indicator
       setIsTyping(true);
 
       try {
-        // Call the backend API
+        // Call the backend API (this creates the session if it doesn't exist)
         const response = await apiRepo.sendChatMessage(
           userId,
           conversation.id, // This is the session_id
           content.trim()
         );
+
+        // Update title after session is created in the database
+        if (isFirstMessage) {
+          updateConversationTitle(conversation.id, content.trim());
+        }
 
         // Create assistant message from response
         const assistantMessage = createMessage("assistant", response.response);
