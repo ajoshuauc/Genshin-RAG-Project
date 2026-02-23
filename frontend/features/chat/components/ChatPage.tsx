@@ -4,6 +4,7 @@ import { ConversationsSidebar } from "./ConversationsSidebar";
 import { Header } from "./Header";
 import { WelcomeEmptyState } from "./WelcomeEmptyState";
 import { MessagesPanel } from "./MessagesPanel";
+import { TranscriptSkeleton } from "./MessageBubble";
 import { Composer } from "./Composer";
 import { useConversations } from "../hooks/useConversations";
 import { useChat } from "../hooks/useChat";
@@ -14,16 +15,20 @@ export function ChatPage() {
     conversations,
     activeConversation,
     activeConversationId,
+    isLoadingTranscript,
     createConversation,
     selectConversation,
     updateConversation,
     updateConversationTitle,
+    persistConversationTitle,
+    deleteConversation,
   } = useConversations();
 
   const { messages, isTyping, sendMessage } = useChat({
     activeConversation,
     updateConversation,
     updateConversationTitle,
+    persistConversationTitle,
     createConversation,
   });
 
@@ -63,6 +68,7 @@ export function ChatPage() {
         activeConversationId={activeConversationId}
         onNewConversation={handleNewConversation}
         onSelectConversation={handleSelectConversation}
+        onDeleteConversation={deleteConversation}
         isOpen={isSidebarOpen}
         isDesktop={isDesktop}
         onClose={closeSidebar}
@@ -94,8 +100,10 @@ export function ChatPage() {
           onToggleSidebar={toggleSidebar}
         />
 
-        {/* Messages or empty state */}
-        {hasMessages ? (
+        {/* Messages, loading skeleton, or empty state */}
+        {isLoadingTranscript ? (
+          <TranscriptSkeleton />
+        ) : hasMessages ? (
           <MessagesPanel messages={messages} isTyping={isTyping} />
         ) : (
           <WelcomeEmptyState onSelectPrompt={sendMessage} />

@@ -14,7 +14,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Genshin Chat Companion",
+  title: "Genshin GPT",
   description: "Your guide through Teyvat - A Genshin Impact AI companion",
 };
 

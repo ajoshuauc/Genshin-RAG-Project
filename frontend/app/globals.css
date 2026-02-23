@@ -5,11 +5,14 @@
   /* Core palette (HSL values) */
   --background: 222 47% 8%;
   --foreground: 45 30% 92%;
-  --primary: 45 80% 60%;
+  --primary: 45 70% 50%;
+  --primary-foreground: 222 47% 8%;
   --secondary: 220 50% 18%;
   --accent: 190 70% 45%;
   --muted: 220 35% 16%;
+  --muted-foreground: 220 20% 55%;
   --border: 220 40% 20%;
+  --card: 222 40% 12%;
 
   /* Message bubbles */
   --bubble-ai: 220 45% 14%;
@@ -35,10 +38,13 @@
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
   --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
   --color-secondary: hsl(var(--secondary));
   --color-accent: hsl(var(--accent));
   --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
   --color-border: hsl(var(--border));
+  --color-card: hsl(var(--card));
   --color-bubble-ai: hsl(var(--bubble-ai));
   --color-bubble-user: hsl(var(--bubble-user));
   --color-starlight: hsl(var(--starlight));
@@ -73,16 +79,16 @@ body {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-8px);
+    transform: translateY(-10px);
   }
 }
 
 @keyframes pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 5px hsl(var(--primary) / 0.3), 0 0 10px hsl(var(--primary) / 0.2);
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.2);
   }
   50% {
-    box-shadow: 0 0 15px hsl(var(--primary) / 0.5), 0 0 30px hsl(var(--primary) / 0.3);
+    box-shadow: 0 0 40px hsl(var(--primary) / 0.4);
   }
 }
 
@@ -164,9 +170,9 @@ body {
 .animate-shimmer {
   background: linear-gradient(
     90deg,
-    hsl(var(--primary) / 0) 0%,
-    hsl(var(--primary) / 0.3) 50%,
-    hsl(var(--primary) / 0) 100%
+    transparent 0%,
+    hsl(var(--primary) / 0.1) 50%,
+    transparent 100%
   );
   background-size: 200% 100%;
   animation: shimmer 3s linear infinite;
@@ -233,11 +239,15 @@ body {
 }
 
 .shadow-glow {
-  box-shadow: 0 0 10px hsl(var(--primary) / 0.3), 0 0 20px hsl(var(--primary) / 0.1);
+  box-shadow: 0 0 30px hsl(var(--primary) / 0.15);
 }
 
 .shadow-glow-strong {
-  box-shadow: 0 0 15px hsl(var(--primary) / 0.5), 0 0 30px hsl(var(--primary) / 0.2), 0 0 45px hsl(var(--primary) / 0.1);
+  box-shadow: 0 0 50px hsl(var(--primary) / 0.25);
+}
+
+.shadow-input {
+  box-shadow: 0 2px 10px hsl(222 60% 3% / 0.3);
 }
 
 .shadow-card {

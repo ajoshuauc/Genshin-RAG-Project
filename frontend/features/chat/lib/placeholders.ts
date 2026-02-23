@@ -3,8 +3,8 @@ import { Conversation, Message } from "../types";
 // Quick prompt suggestions
 export const QUICK_PROMPTS = [
   "Tell me about Mondstadt",
-  "Best team compositions",
-  "Explain elemental reactions",
+  "Describe the Cataclysm",
+  "Who is Zhongli?",
 ];
 
 // Generate a unique UUID

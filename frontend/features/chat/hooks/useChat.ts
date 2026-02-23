@@ -10,6 +10,7 @@ interface UseChatOptions {
   activeConversation: Conversation | null;
   updateConversation: (id: string, updates: Partial<Conversation>) => void;
   updateConversationTitle: (id: string, firstMessage: string) => void;
+  persistConversationTitle: (id: string, firstMessage: string) => void;
   createConversation: () => Conversation;
 }
 
@@ -17,6 +18,7 @@ export function useChat({
   activeConversation,
   updateConversation,
   updateConversationTitle,
+  persistConversationTitle,
   createConversation,
 }: UseChatOptions) {
   const [isTyping, setIsTyping] = useState(false);
@@ -44,6 +46,11 @@ export function useChat({
       const updatedMessages = [...conversation.messages, userMessage];
       updateConversation(conversation.id, { messages: updatedMessages });
 
+      // Update title immediately (optimistic)
+      if (isFirstMessage) {
+        updateConversationTitle(conversation.id, content.trim());
+      }
+
       // Show typing indicator
       setIsTyping(true);
 
@@ -55,9 +62,9 @@ export function useChat({
           content.trim()
         );
 
-        // Update title after session is created in the database
+        // Persist title to database after session is created
         if (isFirstMessage) {
-          updateConversationTitle(conversation.id, content.trim());
+          persistConversationTitle(conversation.id, content.trim());
         }
 
         // Create assistant message from response
@@ -81,7 +88,7 @@ export function useChat({
         setIsTyping(false);
       }
     },
-    [activeConversation, updateConversation, updateConversationTitle, createConversation]
+    [activeConversation, updateConversation, updateConversationTitle, persistConversationTitle, createConversation]
   );
 
   return {

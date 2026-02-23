@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef } from "react";
-import { Plus, MessageSquare, Settings, X } from "lucide-react";
+import { Plus, MessageSquare, X, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Conversation } from "../types";
 import { formatRelativeTime } from "../lib/time";
@@ -11,6 +11,7 @@ interface ConversationsSidebarProps {
   activeConversationId: string | null;
   onNewConversation: () => void;
   onSelectConversation: (id: string) => void;
+  onDeleteConversation: (id: string) => void;
   isOpen: boolean;
   isDesktop: boolean;
   onClose: () => void;
@@ -25,6 +26,7 @@ export const ConversationsSidebar = forwardRef<
     activeConversationId,
     onNewConversation,
     onSelectConversation,
+    onDeleteConversation,
     isOpen,
     isDesktop,
     onClose,
@@ -57,7 +59,7 @@ export const ConversationsSidebar = forwardRef<
         {!isDesktop && (
           <button
             onClick={onClose}
-            className="p-1.5 text-foreground/60 hover:text-foreground hover:bg-secondary/50 rounded-lg transition-colors"
+            className="p-1.5 text-foreground/60 hover:text-foreground hover:bg-secondary/50 rounded-lg transition-colors cursor-pointer"
             aria-label="Close sidebar"
           >
             <X className="w-5 h-5" />
@@ -85,24 +87,38 @@ export const ConversationsSidebar = forwardRef<
         <ul className="space-y-1">
           {conversations.map((conversation) => (
             <li key={conversation.id}>
-              <button
-                onClick={() => onSelectConversation(conversation.id)}
-                className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+              <div
+                className={`group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
                   activeConversationId === conversation.id
                     ? "bg-secondary/80 border border-primary/30"
                     : "hover:bg-secondary/50 border border-transparent"
                 }`}
               >
-                <MessageSquare className="w-4 h-4 mt-0.5 text-foreground/50 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-foreground truncate">
-                    {conversation.title}
-                  </p>
-                  <p className="text-xs text-foreground/40">
-                    {formatRelativeTime(conversation.updatedAt)}
-                  </p>
-                </div>
-              </button>
+                <button
+                  onClick={() => onSelectConversation(conversation.id)}
+                  className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
+                >
+                  <MessageSquare className="w-4 h-4 text-foreground/50 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-foreground truncate">
+                      {conversation.title}
+                    </p>
+                    <p className="text-xs text-foreground/40">
+                      {formatRelativeTime(conversation.updatedAt)}
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteConversation(conversation.id);
+                  }}
+                  className="p-1 text-foreground/30 hover:text-red-400 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0 cursor-pointer"
+                  aria-label="Delete conversation"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -110,10 +126,9 @@ export const ConversationsSidebar = forwardRef<
 
       {/* Footer */}
       <div className="p-4 border-t border-border/30">
-        <button className="flex items-center gap-3 w-full px-3 py-2 text-sm text-foreground/60 hover:text-foreground hover:bg-secondary/50 rounded-lg transition-colors">
-          <Settings className="w-4 h-4" />
-          Settings
-        </button>
+        <p className="text-center text-xs text-foreground/40">
+          © 2026 Anthony Cagampang. All rights reserved.
+        </p>
       </div>
     </aside>
   );

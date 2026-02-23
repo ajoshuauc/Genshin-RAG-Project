@@ -13,6 +13,7 @@ export function useConversations() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingTranscript, setIsLoadingTranscript] = useState(false);
 
   // Load sessions from backend on mount
   useEffect(() => {
@@ -55,6 +56,7 @@ export function useConversations() {
       return; // Already loaded
     }
 
+    setIsLoadingTranscript(true);
     try {
       const session = await apiRepo.getSession(userId, conversationId);
       if (session) {
@@ -68,6 +70,8 @@ export function useConversations() {
       }
     } catch (error) {
       console.error("Failed to load session transcript:", error);
+    } finally {
+      setIsLoadingTranscript(false);
     }
   }, [conversations]);
 
@@ -95,7 +99,13 @@ export function useConversations() {
     (conversationId: string, firstMessage: string) => {
       const title = deriveTitleFromMessage(firstMessage);
       updateConversation(conversationId, { title });
+    },
+    [updateConversation]
+  );
 
+  const persistConversationTitle = useCallback(
+    (conversationId: string, firstMessage: string) => {
+      const title = deriveTitleFromMessage(firstMessage);
       const userId = getOrCreateUserId();
       if (userId) {
         apiRepo.renameSession(userId, conversationId, title).catch((err) => {
@@ -103,7 +113,7 @@ export function useConversations() {
         });
       }
     },
-    [updateConversation]
+    []
   );
 
   const deleteConversation = useCallback((conversationId: string) => {
@@ -111,6 +121,13 @@ export function useConversations() {
     setActiveConversationId((currentId) =>
       currentId === conversationId ? null : currentId
     );
+
+    const userId = getOrCreateUserId();
+    if (userId) {
+      apiRepo.deleteSession(userId, conversationId).catch((err) => {
+        console.error("Failed to delete session:", err);
+      });
+    }
   }, []);
 
   // Sort conversations by updatedAt (most recent first)
@@ -123,10 +140,12 @@ export function useConversations() {
     activeConversation,
     activeConversationId,
     isLoading,
+    isLoadingTranscript,
     createConversation,
     selectConversation,
     updateConversation,
     updateConversationTitle,
+    persistConversationTitle,
     deleteConversation,
   };
 }

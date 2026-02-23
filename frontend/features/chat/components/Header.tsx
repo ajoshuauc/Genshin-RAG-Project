@@ -25,7 +25,7 @@ export function Header({
           <button
             ref={triggerRef}
             onClick={onToggleSidebar}
-            className="p-2 -ml-2 text-foreground/60 hover:text-foreground hover:bg-secondary/50 rounded-lg transition-colors"
+            className="p-2 -ml-2 text-foreground/60 hover:text-foreground hover:bg-secondary/50 rounded-lg transition-colors cursor-pointer"
             aria-controls="sidebar"
             aria-expanded={isSidebarOpen}
             aria-label={isSidebarOpen ? "Close menu" : "Open menu"}
@@ -35,12 +35,12 @@ export function Header({
         )}
 
         {/* Logo and title */}
-        <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/20 text-primary">
-          <Sparkles className="w-5 h-5" />
+        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 genshin-border animate-pulse-glow">
+          <Sparkles className="w-5 h-5 text-primary" />
         </div>
         <div>
           <h1 className="text-lg font-semibold text-gradient-gold font-[family-name:var(--font-cinzel)]">
-            Genshin Chat Companion
+            Genshin GPT
           </h1>
           <p className="text-sm text-foreground/50 hidden sm:block">
             Your guide through Teyvat

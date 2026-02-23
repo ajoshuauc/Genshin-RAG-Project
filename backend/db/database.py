@@ -1,6 +1,8 @@
 """
 Async SQLAlchemy engine and session factory for Supabase Postgres.
 """
+from collections.abc import AsyncGenerator
+
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from backend.core.config import config
 
@@ -33,7 +35,7 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     FastAPI dependency that yields an async database session.
     Usage: db: AsyncSession = Depends(get_db)

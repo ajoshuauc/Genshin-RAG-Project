@@ -59,6 +59,22 @@ async def rename_session(
     return {"ok": True}
 
 
+@router.delete("/sessions/{session_id}")
+async def delete_session(
+    session_id: UUID,
+    user_id: UUID = Depends(get_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Soft-delete a session. Only the owning user may delete it.
+    """
+    deleted = await chat_repo.soft_delete_session(db, session_id, user_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await db.commit()
+    return {"ok": True}
+
+
 @router.get("/sessions/{session_id}", response_model=SessionTranscriptResponse)
 async def get_session_transcript(
     session_id: UUID,

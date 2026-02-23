@@ -140,9 +140,15 @@ export class ApiSessionsRepository implements SessionsRepository {
     }
   }
 
-  async deleteSession(_userId: string, _sessionId: string): Promise<void> {
-    // Not implemented yet - would need a DELETE endpoint
-    console.warn("deleteSession: Not implemented on backend yet");
+  async deleteSession(userId: string, sessionId: string): Promise<void> {
+    const res = await fetch(`${this.baseUrl}/api/v1/sessions/${sessionId}`, {
+      method: "DELETE",
+      headers: this.headers(userId),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to delete session: ${res.status}`);
+    }
   }
 }
 

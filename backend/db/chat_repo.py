@@ -107,6 +107,26 @@ async def update_session_title(
     return result.rowcount > 0
 
 
+async def soft_delete_session(
+    db: AsyncSession, session_id: UUID, user_id: UUID
+) -> bool:
+    """
+    Soft-delete a session by setting deleted_at. Returns False if not found/owned.
+    """
+    result = cast(
+        CursorResult,
+        await db.execute(
+            text("""
+                UPDATE chat_sessions
+                SET deleted_at = now()
+                WHERE id = :session_id AND user_id = :user_id AND deleted_at IS NULL
+            """),
+            {"session_id": session_id, "user_id": user_id},
+        ),
+    )
+    return result.rowcount > 0
+
+
 async def list_sessions(db: AsyncSession, user_id: UUID) -> list[dict]:
     """
     List all non-deleted sessions for a user, ordered by updated_at desc.
