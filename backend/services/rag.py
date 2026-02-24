@@ -58,7 +58,7 @@ Given conversation context and a user message, do TWO things:
      multiple sources (e.g., "How does Ei's ideal of eternity compare to
      Zhongli's idea of contracts?")
 
-CONVERSATION SUMMARY:
+CONVERSATION SUMMARY:Did 
 {summary}
 
 RECENT CHAT:

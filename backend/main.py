@@ -9,6 +9,10 @@ from backend.core.config import config
 
 app = FastAPI(title="Genshin RAG API", description="API for the Genshin RAG project")
 
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
 # CORS middleware for frontend access
 app.add_middleware(
     CORSMiddleware,

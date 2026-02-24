@@ -3,7 +3,7 @@ import { Conversation, Message } from "../types";
 // Quick prompt suggestions
 export const QUICK_PROMPTS = [
   "Tell me about Mondstadt",
-  "Describe the Cataclysm",
+  "Give a brief summary of the events during the Cataclysm",
   "Who is Zhongli?",
 ];
 
