@@ -22,7 +22,7 @@ def classify_query(question: str) -> dict:
         Question: {question}
 
         Respond with JSON only:
-        {{"complexity": "simple" or "deep", "reasoning": "one sentence"}}"""
+        {{"complexity": "simple" or "deep"}}"""
     )
     chain = prompt | llm | StrOutputParser()
     response = chain.invoke({"question": question})
@@ -31,17 +31,140 @@ def classify_query(question: str) -> dict:
         return json.loads(response)
     except json.JSONDecodeError:
         if "deep" in response.lower():
-            return {"complexity": "deep", "reasoning": response}
-        return {"complexity": "simple", "reasoning": response}
+            return {"complexity": "deep"}
+        return {"complexity": "simple"}
+
+
+def classify_intent(question: str) -> dict:
+    """Classify whether a question is Genshin-related lore or something else."""
+    llm = get_llm_simple()
+    prompt = ChatPromptTemplate.from_template(
+        """You are a Genshin Impact lore assistant.
+
+Classify the user's message by INTENT. Possible values:
+
+- "lore": question or request about Genshin Impact (story, characters, regions,
+  gameplay concepts, builds, events, etc.). Single-word messages that are valid
+  Genshin names (e.g., "Zhongli", "Nahida", "Mondstadt") also count as "lore".
+- "small_talk": greetings or casual conversation (e.g., "hi", "hello",
+  "how are you?", "what's up").
+- "meta": questions about you or the system (e.g., "what are you?",
+  "who made you?", "how do you work?").
+- "off_topic": anything clearly unrelated to Genshin Impact.
+
+Message: {question}
+
+Respond with JSON only:
+{{"intent": "lore" | "small_talk" | "meta" | "off_topic"}}"""
+    )
+    chain = prompt | llm | StrOutputParser()
+    response = chain.invoke({"question": question}).strip()
+
+    try:
+        data = json.loads(response)
+        intent = data.get("intent", "lore")
+        data["intent"] = intent
+        return data
+    except json.JSONDecodeError:
+        lower_q = question.lower()
+        genshin_keywords = [
+            "genshin",
+            "mondstadt",
+            "liyue",
+            "inazuma",
+            "sumeru",
+            "fontaine",
+            "natlan",
+            "snezhnaya",
+            "zhongli",
+            "nahida",
+            "ei",
+            "raiden",
+            "venti",
+            "furina",
+        ]
+        if any(name in lower_q for name in genshin_keywords):
+            intent = "lore"
+        elif lower_q in {"hi", "hello", "hey"}:
+            intent = "small_talk"
+        else:
+            intent = "off_topic"
+
+        return {"intent": intent}
+
+
+def classify_first_message(question: str) -> dict:
+    """Classify the first user message by both complexity and intent in a single call."""
+    llm = get_llm_simple()
+    prompt = ChatPromptTemplate.from_template(
+        """You are a Genshin Impact lore assistant.
+
+Classify this FIRST user message in two ways:
+
+1. COMPLEXITY:
+   - "simple": straightforward fact lookup (e.g., "Who is Zhongli?")
+   - "deep": requires analysis, comparison, or synthesis.
+
+2. INTENT:
+   - "lore": about Genshin Impact (story, characters, regions,
+     gameplay concepts, builds, events, etc.). Single-word valid
+     Genshin names (e.g., "Zhongli", "Nahida", "Mondstadt") also count.
+   - "small_talk": greetings / casual chat (e.g., "hi", "hello",
+     "how are you?").
+   - "meta": questions about you or the system (e.g., "what are you?",
+     "who made you?", "how do you work?").
+   - "off_topic": clearly not about Genshin.
+
+Message: {question}
+
+Respond with JSON only:
+{{"complexity": "simple" | "deep",
+  "intent": "lore" | "small_talk" | "meta" | "off_topic"}}"""
+    )
+    chain = prompt | llm | StrOutputParser()
+    response = chain.invoke({"question": question}).strip()
+
+    try:
+        data = json.loads(response)
+        complexity = data.get("complexity", "simple")
+        intent = data.get("intent", "lore")
+        return {"complexity": complexity, "intent": intent}
+    except json.JSONDecodeError:
+        lower_q = question.lower()
+        genshin_keywords = [
+            "genshin",
+            "mondstadt",
+            "liyue",
+            "inazuma",
+            "sumeru",
+            "fontaine",
+            "natlan",
+            "snezhnaya",
+            "zhongli",
+            "nahida",
+            "ei",
+            "raiden",
+            "venti",
+            "furina",
+        ]
+        if any(name in lower_q for name in genshin_keywords):
+            intent = "lore"
+        elif lower_q in {"hi", "hello", "hey"}:
+            intent = "small_talk"
+        else:
+            intent = "off_topic"
+
+        complexity = "deep" if ("why" in lower_q or "how" in lower_q) else "simple"
+        return {"complexity": complexity, "intent": intent}
 
 
 def rewrite_and_classify(user_message: str, chat_history: str, summary: str) -> dict:
-    """Rewrite a follow-up into a standalone search query AND classify complexity in one call."""
+    """Rewrite a follow-up into a standalone search query AND classify complexity/intent in one call."""
     llm = get_llm_simple()
     prompt = ChatPromptTemplate.from_template(
         """You are a Genshin Impact lore search assistant.
 
-Given conversation context and a user message, do TWO things:
+Given conversation context and a user message, do THREE things:
 
 1. REWRITE the user's message into a standalone search query optimized for
    retrieving Genshin Impact lore. Resolve all pronouns and references
@@ -58,6 +181,17 @@ Given conversation context and a user message, do TWO things:
      multiple sources (e.g., "How does Ei's ideal of eternity compare to
      Zhongli's idea of contracts?")
 
+3. CLASSIFY the INTENT as one of:
+   - "lore": the user is asking about Genshin Impact (story, characters,
+     regions, gameplay concepts, builds, etc.). Single-word messages that
+     are valid Genshin names (e.g., "Zhongli", "Nahida", "Mondstadt")
+     also count as "lore".
+   - "small_talk": greetings or casual conversation (e.g., "hi", "hello",
+     "how are you?").
+   - "meta": questions about you or the system (e.g., "what are you?",
+     "who made you?").
+   - "off_topic": anything clearly unrelated to Genshin Impact.
+
 CONVERSATION SUMMARY:Did 
 {summary}
 
@@ -67,7 +201,9 @@ RECENT CHAT:
 USER MESSAGE: {question}
 
 Respond with JSON only:
-{{"rewritten_query": "...", "complexity": "simple" or "deep", "reasoning": "one sentence"}}"""
+{{"rewritten_query": "...",
+  "complexity": "simple" or "deep",
+  "intent": "lore" | "small_talk" | "meta" | "off_topic"}}"""
     )
     chain = prompt | llm | StrOutputParser()
     response = chain.invoke({
@@ -82,7 +218,7 @@ Respond with JSON only:
         return {
             "rewritten_query": user_message,
             "complexity": "deep" if "deep" in response.lower() else "simple",
-            "reasoning": response,
+            "intent": "lore",
         }
 
 def build_simple_retriever():
@@ -128,7 +264,7 @@ def build_answer_chain(llm):
     - Never tell the user that lore or context was "provided" or "retrieved". Present information naturally as if you know it.
     - You may use CONVERSATION SUMMARY / RECENT CHAT only to resolve references (e.g., pronouns) or user intent, but do not introduce new lore facts unless supported by the retrieved lore.
     - If the retrieved lore does not support an answer, say what is missing and ask a brief clarifying question (do not guess).
-    - If asked about something random or not related to the game, say that you are a Genshin Impact lore expert and you can only answer questions about the game.
+    - If a user asks about something unrelated to Genshin Impact, briefly acknowledge the topic in a neutral way, smoothly redirect the conversation to Genshin lore, and end by reminding that you are a Genshin Impact lore expert only.
 
     CONVERSATION SUMMARY:
     {summary}
@@ -167,16 +303,68 @@ def answer_with_rag(session_id: str, user_message: str) -> tuple[str, list]:
 
     if is_first_message:
         search_query = user_message
-        classification = classify_query(user_message)
-        complexity = classification.get("complexity", "simple")
-        print(f"DEBUG: First message — skipped rewrite")
+        first_classification = classify_first_message(user_message)
+        complexity = first_classification.get("complexity", "simple")
+        intent = first_classification.get("intent", "lore")
+        print(
+            f"DEBUG: First message — complexity='{complexity}', intent='{intent}'"
+        )
     else:
         result = rewrite_and_classify(user_message, chat_history_str, summary)
         search_query = result["rewritten_query"]
         complexity = result.get("complexity", "simple")
+        intent = result.get("intent", "lore")
         print(f"DEBUG: Rewritten query: {search_query}")
 
     print(f"DEBUG: Query classified as '{complexity}'")
+
+    # If this isn't a Genshin-related lore question, skip retrieval and
+    # respond directly as a Genshin Impact lore expert.
+    if intent != "lore":
+        llm = get_llm_simple()
+        prompt = ChatPromptTemplate.from_template(
+            """You are a friendly Genshin Impact lore expert.
+
+INTENT: {intent}
+
+Write a short, natural reply in 1–2 sentences:
+
+- Always make it clear you can ONLY answer questions about Genshin Impact lore,
+  characters, story, regions, and world.
+- Do NOT give detailed help or advice about non-Genshin topics (no instructions
+  for taxes, jobs, weather, etc.).
+- Do NOT mention that you are following "rules" or "guidelines".
+
+If INTENT is "small_talk":
+- Briefly greet the user and keep a warm tone.
+- Acknowledge that they greeted you or started a casual chat.
+- Then gently say you can only answer Genshin Impact lore questions.
+
+If INTENT is "meta":
+- Briefly explain that you are an AI assistant focused on Genshin Impact.
+- Mention that you can’t handle general questions beyond that.
+- Invite them to ask about Genshin lore, characters, or story.
+
+If INTENT is "off_topic":
+- Briefly acknowledge the type of topic (without giving real-world advice).
+- Clearly say you can’t help with real-world topics like that here.
+- Emphasize that you can only answer Genshin Impact lore questions.
+
+USER MESSAGE:
+{question}
+
+ANSWER (1–2 sentences):"""
+        )
+        chain = prompt | llm | StrOutputParser()
+        answer = chain.invoke({
+            "intent": intent,
+            "question": user_message,
+        })
+
+        memory.save_context({"input": user_message}, {"output": answer})
+        persist_memory(session_id, memory)
+
+        return answer, []
 
     # 3) Select LLM based on complexity
     llm = get_llm_deep() if complexity == "deep" else get_llm_simple()

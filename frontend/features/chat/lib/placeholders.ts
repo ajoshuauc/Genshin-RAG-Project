@@ -2,9 +2,9 @@ import { Conversation, Message } from "../types";
 
 // Quick prompt suggestions
 export const QUICK_PROMPTS = [
-  "Tell me about Mondstadt",
-  "Give a brief summary of the events during the Cataclysm",
   "Who is Zhongli?",
+  "Give a brief summary of the events during the Cataclysm",
+  "Who seperated the Traveler from their sibling?",
 ];
 
 // Generate a unique UUID

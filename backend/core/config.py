@@ -27,10 +27,10 @@ class Config:
     SIMPLE_RERANK_TOP_N: int = int(os.getenv("SIMPLE_RERANK_TOP_N", "3"))
     # Retrieval — deep (wider net, more docs survive rerank)
     DEEP_RETRIEVAL_K: int = int(os.getenv("DEEP_RETRIEVAL_K", "12"))
-    DEEP_RERANK_TOP_N: int = int(os.getenv("DEEP_RERANK_TOP_N", "4"))
+    DEEP_RERANK_TOP_N: int = int(os.getenv("DEEP_RERANK_TOP_N", "3"))
 
     # LLM Performance
-    LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "2500"))  # Limit response length for faster generation
+    LLM_MAX_TOKENS: int = int(os.getenv("LLM_MAX_TOKENS", "2200"))  # Limit response length for faster generation
     MAX_CONTEXT_LENGTH: int = int(os.getenv("MAX_CONTEXT_LENGTH", "16000"))  # Limit context characters
 
     # Memory
